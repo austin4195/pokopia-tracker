@@ -86,8 +86,31 @@ const SPEC_META={
 };
 const SPEC_ORDER=["Appraise", "Build", "Bulldoze", "Burn", "Crush", "Chop", "Collect", "Dream Island", "DJ", "Eat", "Engineer", "Explode", "Fly", "Gather", "Gather Honey", "Generate", "Grow", "Hype", "Illuminate", "Paint", "Litter", "Party", "Rarify", "Recycle", "Search", "Storage", "Teleport", "Trade", "Transform", "Water", "Yawn"];
 
-const VERSION="v5.2.1", BUILD="2026-07-07";
-const V5="pokopia:tracker:v5", V4="pokopia:tracker:v4", V3="pokopia:tracker:v3", V2="pokopia:tracker:v2", V1="pokopia:tracker";
+const HOUSE_TYPES = [
+  {k:"leaf-den", n:"Leaf den", cap:1}, {k:"leaf-hut", n:"Leaf hut", cap:1}, {k:"sand-den", n:"Sand den", cap:1},
+  {k:"sand-hut", n:"Sand hut", cap:1}, {k:"stone-den", n:"Stone den", cap:1}, {k:"stone-hut", n:"Stone hut", cap:1},
+  {k:"city-den", n:"City den", cap:1}, {k:"city-hut", n:"City hut", cap:1}, {k:"pokeball-house", n:"Pok\u00e9ball house", cap:1},
+  {k:"tent", n:"Tent", cap:1},
+  {k:"leaf-cottage", n:"Leaf cottage", cap:2}, {k:"sand-cottage", n:"Sand cottage", cap:2},
+  {k:"stone-cottage", n:"Stone cottage", cap:2}, {k:"city-cottage", n:"City cottage", cap:2},
+  {k:"leaf-house", n:"Leaf house", cap:4}, {k:"sand-house", n:"Sand house", cap:4}, {k:"stone-house", n:"Stone house", cap:4},
+  {k:"city-house", n:"City house", cap:4}, {k:"pink-hut", n:"Pink hut", cap:4}, {k:"pink-cottage", n:"Pink cottage", cap:4},
+  {k:"orange-hut", n:"Orange hut", cap:4}, {k:"orange-cottage", n:"Orange cottage", cap:4}, {k:"gray-hut", n:"Gray hut", cap:4},
+  {k:"gray-cottage", n:"Gray cottage", cap:4}, {k:"yellow-hut", n:"Yellow hut", cap:4}, {k:"yellow-cottage", n:"Yellow cottage", cap:4},
+  {k:"log-cabin", n:"Log cabin", cap:4},
+];
+const HOUSE_BY = {}; HOUSE_TYPES.forEach(h => HOUSE_BY[h.k] = h);
+
+/* Ideal Habitat — the ambient mood/theme each Pok\u00e9mon prefers in a home. Source: Pokopia Pokemon spreadsheet. */
+const IDEAL_HABITAT = {"Amp. Toxtricity*":"Humid","Low. Toxtricity*":"Humid","Armarouge*":"Warm","Ceruledge*":"Warm","Aerodactyl*":"Dry","Cranidos*":"Dry","Rampardos*":"Dry","Shieldon*":"Dry","Bastiodon*":"Dry","Tyrunt*":"Dry","Tyrantrum*":"Dry","Amaura*":"Cool","Aurorus*":"Cool","Hoppip":"Bright","Skiploom":"Bright","Jumpluff":"Bright","Sableye":"Dark","Gloom":"Humid","Magneton":"Bright","Magnezone":"Bright","Peakychu":"Bright","Zubat":"Dark","Golbat":"Dark","Crobat":"Dark","Meowth":"Cool","Psyduck":"Humid","Golduck":"Humid","Growlithe":"Warm","Farfetch'd":"Warm","Grimer*":"Dark","Muk*":"Dark","Gastly":"Dark","Haunter":"Dark","Gengar":"Dark","Voltorb":"Bright","Electrode":"Bright","Exeggcute":"Bright","Exeggutor":"Bright","Happiny":"Bright","Chansey":"Bright","Blissey":"Bright","Elekid":"Bright","Electabuzz":"Bright","Electivire":"Bright","Lapras":"Humid","Mosslax":"Bright","Spinarak":"Humid","Ariados":"Humid","Mareep":"Bright","Flaafy":"Bright","Ampharos":"Bright","Azurill":"Humid","Marill":"Humid","Azumarill":"Humid","Pal. Wooper":"Humid","Clodsire":"Humid","Smearguru":"Bright","Torchic":"Warm","Combusken":"Warm","Blaziken":"Warm","Wingull":"Humid","Pelipper":"Humid","Makuhita":"Bright","Hariyama":"Bright","Absol":"Dark","Piplup":"Humid","Prinplup":"Humid","Empoleon":"Humid","Audino":"Bright","Trubbish":"Humid","Garbodor":"Humid","Zorua":"Dark","Zoroark":"Dark","Minccino":"Bright","Cinccino":"Bright","Grubbin":"Bright","Charjabug":"Bright","Mimikyu":"Dark","Pawmi":"Bright","Pawmo":"Bright","Pawmot":"Bright","C. Tatsugiri":"Humid","D. Tatsugiri":"Humid","S. Tatsugiri":"Humid","Raikou":"Bright","Entei":"Warm","Suicune":"Humid","Mewtwo":"Dark","Koffing":"Dark","Weezing":"Dark","Tangela":"Bright","Scizor":"Bright","Cramorant":"Humid","Pikachu":"Bright","Munchlax":"Warm","Snorlax":"Warm","Machop":"Bright","Geodude":"Dark","Mawile":"Bright","Rowlet":"Dark","Skwovet":"Warm","Tinkatink":"Bright","Tinkatuff":"Bright","Eevee":"Warm","Vaporeon":"Humid","Jolteon":"Bright","Flareon":"Warm","Espeon":"Bright","Umbreon":"Dark","Leafeon":"Bright","Glaceon":"Cool","Sylveon":"Warm","Articuno":"Cool","Zapdos":"Bright","Moltres":"Warm","Steelix":"Dry","Swalot":"Humid","Arcanine":"Warm","Ekans":"Dark","Arbok":"Dark","Cleffa":"Dark","Clefairy":"Dark","Clefable":"Dark","Igglybuff":"Warm","Jigglypuff":"Bright","Wigglytuff":"Bright","Diglett":"Dark","Dugtrio":"Dark","Machoke":"Bright","Machamp":"Bright","Graveler":"Dark","Golem":"Dark","Magmar":"Warm","Magmortar":"Warm","Bonsly":"Dry","Sudowoodo":"Dry","Murkrow":"Dark","Honchkrow":"Dark","Larvitar":"Dark","Tyranitar":"Dark","Lotad":"Humid","Lombre":"Humid","Ludicolo":"Humid","Torkoal":"Warm","Kricketot":"Dark","Kricketune":"Dark","Chatot":"Warm","Riolu":"Dark","Lucario":"Dark","DJ Rotom":"Bright","Larvesta":"Dry","Volcarona":"Dry","Dartrix":"Dark","Decidueye":"Dark","Scorbunny":"Warm","Raboot":"Warm","Cinderace":"Warm","Chef Greedent":"Warm","Rolycoly":"Warm","Carkoal":"Warm","Coalossal":"Warm","Toxel":"Humid","Fidough":"Warm","Dachsbun":"Warm","Charcadet":"Warm","Glimmet":"Dark","Glimmora":"Dark","Gimmighoul":"Dark","Gholdengo":"Bright","Politoed":"Humid","Volcanion":"Warm","Gyarados":"Humid","Drifblim":"Warm","Conkeldurr":"Bright","Raichu":"Bright","Persian":"Cool","Pupitar":"Dark","Vulpix":"Warm","Ninetales":"Warm","Poliwag":"Humid","Poliwhirl":"Humid","Poliwrath":"Humid","Abra":"Dark","Kadabra":"Dark","Alakazam":"Dark","Mime Jr.":"Bright","Mr. Mime":"Bright","Porygon":"Bright","Porygon2":"Bright","Porygon-Z":"Bright","Dratini":"Humid","Dragonair":"Humid","Dragonite":"Humid","Cyndaquil":"Warm","Quilava":"Warm","Typhlosion":"Warm","Misdreavus":"Dark","Mismagius":"Dark","Girafarig":"Warm","Farigiraf":"Warm","Ralts":"Bright","Kirlia":"Bright","Gardevoir":"Bright","Gallade":"Bright","Plusle":"Bright","Minun":"Bright","Trapinch":"Dry","Vibrava":"Dry","Flygon":"Dry","Swablu":"Bright","Altaria":"Bright","Duskull":"Dark","Dusclops":"Dark","Dusknoir":"Dark","Beldum":"Cool","Metang":"Cool","Metagross":"Cool","Snivy":"Humid","Servine":"Humid","Serperior":"Humid","Froakie":"Humid","Frogadier":"Humid","Greninja":"Humid","Dedenne":"Bright","Noibat":"Dark","Noivern":"Dark","Rookidee":"Bright","Corvisquire":"Bright","Corviknight":"Bright","Dreepy":"Humid","Drakloak":"Humid","Dragapult":"Humid","Sprigatito":"Bright","Floragato":"Bright","Meowscarada":"Bright","Wattrel":"Bright","Kilowattrel":"Bright","Tinkmaster":"Bright","Bulbasaur":"Bright","Ivysaur":"Bright","Venusaur":"Bright","Charmander":"Warm","Charmeleon":"Warm","Charizard":"Warm","Squirtle":"Humid","Wartortle":"Humid","Blastoise":"Humid","Pidgey":"Bright","Pidgeotto":"Bright","Pidgeot":"Bright","Oddish":"Humid","Vileplume":"Humid","Bellossom":"Bright","Paras":"Humid","Parasect":"Humid","Venonat":"Bright","Venomoth":"Bright","Bellsprout":"Humid","Weepinbell":"Humid","Victreebel":"Humid","Slowpoke":"Humid","Slowbro":"Humid","Slowking":"Humid","Magnemite":"Bright","Onix":"Dry","Cubone":"Dry","Marowak":"Dry","Tyrogue":"Bright","Hitmonlee":"Bright","Hitmonchan":"Bright","Hitmontop":"Bright","Tangrowth":"Humid","Scyther":"Bright","Pinsir":"Bright","Magikarp*":"Humid","Hoothoot":"Dark","Noctowl":"Dark","Heracross":"Bright","Volbeat":"Dark","Illumise":"Dark","Gulpin":"Humid","Cacnea":"Dry","Cacturne":"Dry","Combee":"Bright","Vespiquen":"Bright","W. Shellos":"Humid","E. Shellos":"Humid","W. Gastrodon*":"Humid","E. Gastrodon*":"Humid","Drifloon":"Warm","Drilbur":"Dark","Excadrill":"Dark","Timburr":"Bright","Gurdurr":"Bright","Litwick":"Warm","Lampent":"Warm","Chandelure":"Warm","Axew":"Dark","Fraxure":"Dark","Haxorus":"Dark","Goomy":"Humid","Sliggoo":"Humid","Goodra":"Humid","Pichu":"Bright","Vikavolt":"Bright","Magby":"Warm","Kyogre":"Humid","Mew":"Warm"}
+;
+const IDEAL_HABITAT_META = {
+  Bright:{e:"\u2600\uFE0F",c:"#E3A730"}, Humid:{e:"\u{1F4A7}",c:"#1E9AAE"}, Dark:{e:"\u{1F311}",c:"#5b5b7a"},
+  Warm:{e:"\u{1F525}",c:"#B9743A"}, Dry:{e:"\u{1F3DC}\uFE0F",c:"#9a5c3e"}, Cool:{e:"\u2744\uFE0F",c:"#5689AE"},
+};
+
+const VERSION="v6.1.0", BUILD="2026-07-07";
+const V6="pokopia:tracker:v6", V5="pokopia:tracker:v5", V4="pokopia:tracker:v4", V3="pokopia:tracker:v3", V2="pokopia:tracker:v2", V1="pokopia:tracker";
 function boardAreaFor(mon){ const a=AREA_OF[mon]; return AREA_BY[a] && !AREA_BY[a].special ? a : null; }
 function v3ToV4(v3){ const built={},place={},extra={}; const habs=v3.habitats||{};
   for(const n of Object.keys(habs)){ built[n]=HAB_AREA[n]||"WASTELAND"; const o=habs[n].occupant; if(habs[n].status==="occupied"&&o) place[o]={t:"h",n:+n}; }
@@ -107,18 +130,20 @@ function v4ToV5(v4){ let seq=1; const insts={},place={},extra={...(v4.extra||{})
     if(p.t==="h"){ const id=habToId[String(p.n)]; if(id) place[m]={t:"h",i:id}; else place[m]={t:"house",a:HAB_AREA[p.n]||"WASTELAND"}; }
     else place[m]=p; }
   return {seq,insts,place,extra}; }
-const EMPTY={seq:1,insts:{},place:{},extra:{}};
+function v5ToV6(v5){ return {seq:v5.seq||1, insts:v5.insts||{}, houses:{}, place:v5.place||{}, extra:v5.extra||{}}; }
+const EMPTY={seq:1,insts:{},houses:{},place:{},extra:{}};
 
 async function getKey(k){ try{ if(window.storage){ const r=await window.storage.get(k); if(r&&r.value) return JSON.parse(r.value);} }catch(e){} return null; }
 async function loadState(){
-  const v5=await getKey(V5); if(v5) return {seq:v5.seq||1, insts:v5.insts||{}, place:v5.place||{}, extra:v5.extra||{}};
-  const v4=await getKey(V4); if(v4) return v4ToV5(v4);
-  const v3=await getKey(V3); if(v3) return v4ToV5(v3ToV4(v3));
-  const v2=await getKey(V2); if(v2&&v2.befriended) return v4ToV5(v2ToV4(v2));
-  const v1=await getKey(V1); if(v1&&v1.befriended) return v4ToV5(v1ToV4(v1));
+  const v6=await getKey(V6); if(v6) return {seq:v6.seq||1, insts:v6.insts||{}, houses:v6.houses||{}, place:v6.place||{}, extra:v6.extra||{}};
+  const v5=await getKey(V5); if(v5) return v5ToV6({seq:v5.seq||1, insts:v5.insts||{}, place:v5.place||{}, extra:v5.extra||{}});
+  const v4=await getKey(V4); if(v4) return v5ToV6(v4ToV5(v4));
+  const v3=await getKey(V3); if(v3) return v5ToV6(v4ToV5(v3ToV4(v3)));
+  const v2=await getKey(V2); if(v2&&v2.befriended) return v5ToV6(v4ToV5(v2ToV4(v2)));
+  const v1=await getKey(V1); if(v1&&v1.befriended) return v5ToV6(v4ToV5(v1ToV4(v1)));
   return {...EMPTY};
 }
-async function saveState(s){ try{ if(window.storage) await window.storage.set(V5, JSON.stringify(s)); }catch(e){} }
+async function saveState(s){ try{ if(window.storage) await window.storage.set(V6, JSON.stringify(s)); }catch(e){} }
 
 export default function PokopiaTracker(){
   const [st,setSt]=useState(EMPTY);
@@ -131,7 +156,7 @@ export default function PokopiaTracker(){
   const [view,setView]=useState("island");
   const [specScope,setSpecScope]=useState("area");
   const importRef=useRef();
-  const {insts,place,extra}=st;
+  const {insts,houses,place,extra}=st;
 
   useEffect(()=>{ loadState().then(s=>{ setSt(s); setLoaded(true); }); },[]);
   useEffect(()=>{ if(loaded) saveState(st); },[st,loaded]);
@@ -139,6 +164,7 @@ export default function PokopiaTracker(){
 
   const isBef=(m)=> !!place[m] || !!extra[m];
   const occByInst=useMemo(()=>{ const o={}; for(const m of Object.keys(place)){ const p=place[m]; if(p.t==="h") o[p.i]=m; } return o; },[place]);
+  const occByHouse=useMemo(()=>{ const o={}; for(const m of Object.keys(place)){ const p=place[m]; if(p.t==="house"&&p.h) (o[p.h]=o[p.h]||[]).push(m); } return o; },[place]);
   const total=Object.keys(place).length+Object.keys(extra).length;
   const pct=Math.round(total/TOTAL*100);
 
@@ -148,6 +174,17 @@ export default function PokopiaTracker(){
   const setOccupant=(id,mon)=> setSt(s=>{ const place={...s.place}; const prev=Object.keys(place).find(m=>place[m].t==="h"&&place[m].i===id); if(prev&&prev!==mon) place[prev]={t:"house",a:s.insts[id].area}; place[mon]={t:"h",i:id}; return {...s,place}; });
   const clearOccupant=(id)=> setSt(s=>{ const place={...s.place}; const occ=Object.keys(place).find(m=>place[m].t==="h"&&place[m].i===id); if(occ) place[occ]={t:"house",a:s.insts[id].area}; return {...s,place}; });
   const addHouse=(mon,areaKey)=> setSt(s=>({...s, place:{...s.place,[mon]:{t:"house",a:areaKey}}}));
+  const addHouseBuilding=(buildingKey,areaKey)=> setSt(s=>{ const id="H"+s.seq; const b=HOUSE_BY[buildingKey]; const cap=b?b.cap:1; return {...s, seq:s.seq+1, houses:{...s.houses,[id]:{b:buildingKey,area:areaKey,cap}}}; });
+  const removeHouseBuilding=(id)=> setSt(s=>{ const h=s.houses[id]; if(!h) return s; const place={...s.place}; for(const m of Object.keys(place)){ const p=place[m]; if(p.t==="house"&&p.h===id) place[m]={t:"house",a:h.area}; } const houses={...s.houses}; delete houses[id]; return {...s,houses,place}; });
+  const assignToHouse=(mon,houseId)=> setSt(s=>{ const h=s.houses[houseId]; if(!h) return s; const occCount=Object.keys(s.place).filter(m=>{ const p=s.place[m]; return p.t==="house"&&p.h===houseId&&m!==mon; }).length; if(occCount>=h.cap) return s; return {...s, place:{...s.place,[mon]:{t:"house",h:houseId}}}; });
+  const unassignHouse=(mon)=> setSt(s=>{ const p=s.place[mon]; if(!p||p.t!=="house"||!p.h) return s; const h=s.houses[p.h]; return {...s, place:{...s.place,[mon]:{t:"house",a:h?h.area:"WASTELAND"}}}; });
+  const buildHouseForGroup=(buildingKey,mons,areaKey)=> setSt(s=>{
+    const id="H"+s.seq; const b=HOUSE_BY[buildingKey]; const cap=b?b.cap:1;
+    const houses={...s.houses,[id]:{b:buildingKey,area:areaKey,cap}};
+    const place={...s.place}; let count=0;
+    for(const m of mons){ if(count>=cap) break; if(!place[m]||place[m].t!=="house"||place[m].h) continue; place[m]={t:"house",h:id}; count++; }
+    return {...s, seq:s.seq+1, houses, place};
+  });
   const moveToInstance=(mon,id)=> setSt(s=>{ const place={...s.place}; const prev=Object.keys(place).find(m=>place[m].t==="h"&&place[m].i===id); if(prev&&prev!==mon) place[prev]={t:"house",a:s.insts[id].area}; place[mon]={t:"h",i:id}; return {...s,place}; });
   const buildAndOccupy=(habN,mon,areaKey)=> setSt(s=>{
     const occOf=(id)=> Object.keys(s.place).find(m=>s.place[m].t==="h"&&s.place[m].i===id);
@@ -161,7 +198,7 @@ export default function PokopiaTracker(){
   const toggleExtra=(mon)=> setSt(s=>{ const extra={...s.extra}; if(extra[mon]) delete extra[mon]; else extra[mon]=true; return {...s,extra}; });
   const resetAll=()=>{ if(typeof confirm!=="undefined" && !confirm("Wipe ALL your logged data and start over? This can't be undone.")) return;
     setSt({...EMPTY});
-    try{ if(window.storage&&window.storage.delete){ [V4,V3,V2,V1].forEach(k=>window.storage.delete(k)); } }catch(e){} };
+    try{ if(window.storage&&window.storage.delete){ [V5,V4,V3,V2,V1].forEach(k=>window.storage.delete(k)); } }catch(e){} };
 
   /* ---- recommendations (instance-aware, scoped to area) ---- */
   const recs=useMemo(()=>{
@@ -177,19 +214,30 @@ export default function PokopiaTracker(){
     return {emptyReady,freeSlot,build};
   },[insts,place,extra,occByInst,area]);
 
+  const houseRecs=useMemo(()=>{
+    const a=AREA_BY[area]; if(!a || a.special) return [];
+    const unassigned=Object.keys(place).filter(m=>{ const p=place[m]; return p.t==="house"&&p.a===area; });
+    const groups={};
+    for(const m of unassigned){ const h=IDEAL_HABITAT[m]; if(!h) continue; (groups[h]=groups[h]||[]).push(m); }
+    return Object.keys(groups).filter(h=>groups[h].length>=2).map(h=>({habitat:h,mons:groups[h]})).sort((a,b)=>b.mons.length-a.mons.length);
+  },[place,area]);
+
   const exportProgress=()=>{ try{ const blob=new Blob([JSON.stringify(st,null,2)],{type:"application/json"}); const u=URL.createObjectURL(blob); const a=document.createElement("a"); a.href=u; a.download="pokopia-progress.json"; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(u);}catch(e){} };
   const importProgress=(e)=>{ const f=e.target.files&&e.target.files[0]; if(!f) return; const r=new FileReader(); r.onload=()=>{ try{ const d=JSON.parse(r.result);
-      if(d.insts){ setSt({seq:d.seq||1,insts:d.insts||{},place:d.place||{},extra:d.extra||{}}); }
-      else if(d.built){ setSt(v4ToV5(d)); }
-      else if(d.befriended){ setSt(v4ToV5(v3ToV4(d))); }
+      if(d.insts && d.houses!==undefined){ setSt({seq:d.seq||1,insts:d.insts||{},houses:d.houses||{},place:d.place||{},extra:d.extra||{}}); }
+      else if(d.insts){ setSt(v5ToV6({seq:d.seq||1,insts:d.insts||{},place:d.place||{},extra:d.extra||{}})); }
+      else if(d.built){ setSt(v5ToV6(v4ToV5(d))); }
+      else if(d.befriended){ setSt(v5ToV6(v4ToV5(v3ToV4(d)))); }
     }catch(err){ if(typeof alert!=="undefined") alert("Couldn't read that file."); } }; r.readAsText(f); e.target.value=""; };
 
   if(!loaded) return (<div style={S.page}><style>{CSS}</style><div style={{...S.shell,textAlign:"center",paddingTop:80,color:"#7d8a7e"}}>Loading your island…</div></div>);
 
   const A=AREA_BY[area];
   const monsInArea=(a)=>{ if(AREA_BY[a].special) return AREA_BY[a].mon.filter(m=>extra[m]);
-    const out=[]; for(const m of Object.keys(place)){ const p=place[m]; if(p.t==="h"&&insts[p.i]&&insts[p.i].area===a) out.push(m); else if(p.t==="house"&&p.a===a) out.push(m); } return out; };
+    const out=[]; for(const m of Object.keys(place)){ const p=place[m]; if(p.t==="h"&&insts[p.i]&&insts[p.i].area===a) out.push(m);
+      else if(p.t==="house"){ const hArea = p.h ? (houses[p.h]&&houses[p.h].area) : p.a; if(hArea===a) out.push(m); } } return out; };
   const areaIds=Object.keys(insts).filter(id=>insts[id].area===area).sort((a,b)=> insts[a].hab-insts[b].hab || (a<b?-1:1));
+  const areaHouseIds=Object.keys(houses).filter(id=>houses[id].area===area).sort((a,b)=> a<b?-1:1);
   const areaHouses=Object.keys(place).filter(m=>place[m].t==="house"&&place[m].a===area);
   const placedSet=new Set(Object.keys(place));
   const recPalette=A.special? A.mon.filter(m=>!isBef(m)) : A.mon.filter(m=>!placedSet.has(m));
@@ -310,11 +358,43 @@ export default function PokopiaTracker(){
               <button style={S.addTile} onClick={()=>setSheet({type:"addHab"})}><Plus size={18}/><span>Add habitat</span></button>
             </div>
 
-            <div style={S.zoneLabel}><Home size={13} color={A.accent}/> Houses <span style={S.zc}>{areaHouses.length}</span></div>
+            <div style={S.zoneLabel}><Home size={13} color={A.accent}/> Houses <span style={S.zc}>{areaHouseIds.length}</span></div>
+            <div style={S.tileGrid}>
+              {areaHouseIds.map(id=>{ const h=houses[id]; const occ=occByHouse[id]||[]; const bt=HOUSE_BY[h.b];
+                const habs=new Set(occ.map(m=>IDEAL_HABITAT[m]).filter(Boolean)); const shared=habs.size===1?[...habs][0]:null; return (
+                <div key={id} className="drop" style={{...S.tile, borderColor:occ.length?A.accent:"#e0e7df"}}
+                  onDragOver={e=>e.preventDefault()} onDrop={e=>{const m=e.dataTransfer.getData("mon"); if(m) assignToHouse(m,id);}}
+                  onClick={()=>setSheet({type:"house",id})}>
+                  <div style={{...S.tileImg,display:"flex",alignItems:"center",justifyContent:"center"}}><Home size={26} color={A.accent}/></div>
+                  <div style={S.tileName}>{bt?bt.n:h.b}<span style={S.countPill}>{occ.length}/{h.cap}</span>{shared?<HabitatDot mon={occ[0]} sz={13}/>:null}</div>
+                  {occ.length ? (<div style={S.tileOcc}>{occ.slice(0,3).map(m=><Spr key={m} m={m} sz={18}/>)}{occ.length>3?<span style={{fontSize:11,fontWeight:700}}>+{occ.length-3}</span>:null}</div>)
+                              : (<div style={S.tileEmpty}>empty · tap to fill</div>)}
+                </div>
+              );})}
+              <button style={S.addTile} onClick={()=>setSheet({type:"addHouseBuilding"})}><Plus size={18}/><span>Add house</span></button>
+            </div>
+
+            {houseRecs.length>0 && (<React.Fragment>
+              <div style={S.zoneLabel}><Sprout size={13} color={A.accent}/> Housemate matches <span style={S.zc}>{houseRecs.length}</span></div>
+              <div style={{display:"flex",flexDirection:"column",gap:7,marginBottom:14}}>
+                {houseRecs.map(g=>{ const meta=IDEAL_HABITAT_META[g.habitat]||{}; return (
+                  <button key={g.habitat} style={S.houseRecCard} onClick={()=>setSheet({type:"groupHouse",habitat:g.habitat,mons:g.mons})}>
+                    <span style={{fontSize:18,lineHeight:1}}>{meta.e}</span>
+                    <div style={{flex:1,minWidth:0,textAlign:"left"}}>
+                      <div style={{fontWeight:700,fontSize:13}}>{g.habitat} · {g.mons.length} unassigned like it here</div>
+                      <div style={{fontSize:12,color:"#5b6b5d",marginTop:2}}>{g.mons.slice(0,6).join(", ")}{g.mons.length>6?` +${g.mons.length-6}`:""}</div>
+                    </div>
+                    <span style={S.pctPill}>House them</span>
+                  </button>
+                );})}
+              </div>
+            </React.Fragment>)}
+
+            <div style={S.zoneLabel}><Home size={13} color={A.accent}/> Unassigned <span style={S.zc}>{areaHouses.length}</span></div>
             <div className="drop" style={S.houseBin} onDragOver={e=>e.preventDefault()} onDrop={e=>{const m=e.dataTransfer.getData("mon"); if(m) addHouse(m,area);}}>
               {areaHouses.map(m=>(
                 <button key={m} onClick={()=>setSheet({type:"poke",mon:m})} className="tapchip" style={{...S.pchip,background:"#fff",borderColor:A.accent+"44"}}>
-                  <Spr m={m}/><span style={S.pname}>{m}</span>
+                  <Spr m={m}/><span style={S.pname}>{m}</span><HabitatDot mon={m}/>
                 </button>
               ))}
               <button style={S.addHouse} onClick={()=>setSheet({type:"addHouse"})}><Plus size={16}/> Add</button>
@@ -334,21 +414,23 @@ export default function PokopiaTracker(){
         )}
 
         <footer style={S.footer}>
-          Tap a recommended Pokémon to build the habitat it spawns from, or drop it into a house. Each habitat tile is one built instance — add the same habitat twice to track two of them independently. Placed anywhere = befriended. Lists are recommendations only; “Any Pokémon” puts anyone anywhere. Saves automatically on this device.
+          Tap a recommended Pokémon to build the habitat it spawns from, or add it to a house. Each habitat tile is one built instance — add the same habitat twice to track two of them independently. Houses now work the same way: add a house building, then assign residents up to its capacity — "Housemate matches" suggests groups that share an Ideal Habitat preference. Placed anywhere = befriended. Lists are recommendations only; “Any Pokémon” puts anyone anywhere. Saves automatically on this device.
           <div style={{marginTop:9,paddingTop:9,borderTop:"1px solid #e7ece5",color:"#a4b0a5"}}>Pokopia Tracker <b style={{color:"#7d8a7e"}}>{VERSION}</b> · built {BUILD} · made with <b style={{color:"#7d8a7e"}}>Claude</b> (Anthropic)</div>
         </footer>
       </div>
 
       {sheet && <Sheet sheet={sheet} area={area} A={A} pQuery={pQuery} setPQuery={setPQuery} onClose={()=>setSheet(null)}
-        insts={insts} occByInst={occByInst} isBef={isBef} countByHab={countByHab}
-        actions={{addInstance,removeInstance,setOccupant,clearOccupant,addHouse,moveToInstance,buildAndOccupy,unplace}}/>}
+        insts={insts} houses={houses} occByInst={occByInst} occByHouse={occByHouse} isBef={isBef} countByHab={countByHab} place={place}
+        actions={{addInstance,removeInstance,setOccupant,clearOccupant,addHouse,moveToInstance,buildAndOccupy,unplace,
+                  addHouseBuilding,removeHouseBuilding,assignToHouse,unassignHouse,buildHouseForGroup}}/>}
     </div>
   );
 }
 
 function Spr({m,sz=20}){ const u=SPRITE_URL(m); if(!u) return null; return <img src={u} alt="" loading="lazy" referrerPolicy="no-referrer" style={{width:sz,height:sz,objectFit:"contain",flexShrink:0}} onError={e=>{e.currentTarget.style.visibility="hidden";}}/>; }
+function HabitatDot({mon,sz=11}){ const h=IDEAL_HABITAT[mon]; if(!h) return null; const meta=IDEAL_HABITAT_META[h]||{}; return <span title={h+" habitat"} style={{fontSize:sz,lineHeight:1}}>{meta.e}</span>; }
 
-function Sheet({sheet,area,A,pQuery,setPQuery,onClose,insts,occByInst,isBef,countByHab,actions}){
+function Sheet({sheet,area,A,pQuery,setPQuery,onClose,insts,houses,occByInst,occByHouse,isBef,countByHab,place,actions}){
   const q=pQuery.trim().toLowerCase();
   const allPoke=Object.keys(SPRITE_ID);
   const areaIdsOf=(habN)=> Object.keys(insts).filter(id=>insts[id].area===area && insts[id].hab===+habN);
@@ -387,6 +469,77 @@ function Sheet({sheet,area,A,pQuery,setPQuery,onClose,insts,occByInst,isBef,coun
           <button style={SB.danger} onClick={()=>{actions.removeInstance(id); onClose();}}><Trash2 size={13}/> Remove this habitat</button>
         </div>
       </div>); }
+  } else if(sheet.type==="addHouseBuilding"){
+    title="Add a house to "+A.short;
+    const list=HOUSE_TYPES.filter(h=>!q||h.n.toLowerCase().includes(q));
+    node=(<div style={SB.list}>
+      {list.map(h=>(
+        <button key={h.k} style={SB.row} onClick={()=>{actions.addHouseBuilding(h.k,area); onClose();}}>
+          <Home size={22} color="#5b6b5d"/>
+          <div style={{flex:1,textAlign:"left",minWidth:0}}><div style={{fontWeight:700,fontSize:13}}>{h.n}</div></div>
+          <span style={SB.tag}>{h.cap} {h.cap===1?"resident":"residents"}</span>
+        </button>
+      ))}
+      {list.length===0 && <div style={SB.hint}>No matches.</div>}
+    </div>);
+  } else if(sheet.type==="house"){
+    const id=sheet.id; const h=houses[id];
+    if(!h){ node=<div style={SB.hint}>This house was removed.</div>; }
+    else {
+      const bt=HOUSE_BY[h.b]; title=bt?bt.n:h.b;
+      const occ=occByHouse[id]||[];
+      const occHabitats=new Set(occ.map(m=>IDEAL_HABITAT[m]).filter(Boolean));
+      const candidates=Object.keys(place).filter(m=>{ const p=place[m]; return p.t==="house"&&p.a===area; })
+        .sort((a,b)=>{ const am=occHabitats.has(IDEAL_HABITAT[a])?0:1, bm=occHabitats.has(IDEAL_HABITAT[b])?0:1; return am-bm; });
+      node=(<div>
+        <div style={SB.reqLine}>{occ.length} / {h.cap} residents{occHabitats.size===1?<React.Fragment> · <HabitatDot mon={occ[0]} sz={12}/> {[...occHabitats][0]} household</React.Fragment>:null}</div>
+        <div style={SB.sectlabel}>Residents</div>
+        <div style={SB.list}>
+          {occ.length===0 && <div style={SB.hint}>No one lives here yet.</div>}
+          {occ.map(m=>(
+            <button key={m} style={SB.row} onClick={()=>{actions.unassignHouse(m); onClose();}}>
+              <Spr m={m} sz={24}/><span style={{flex:1,textAlign:"left",fontWeight:600}}>{m}</span><HabitatDot mon={m}/>
+              <span style={SB.tag}>tap to unassign</span>
+            </button>
+          ))}
+        </div>
+        {occ.length<h.cap && (<React.Fragment>
+          <div style={SB.sectlabel}>Add resident (unassigned in {A.short})</div>
+          <div style={SB.list}>
+            {candidates.length===0 && <div style={SB.hint}>No unassigned Pok\u00e9mon here yet — add one from the Unassigned bin first.</div>}
+            {candidates.map(m=>{ const matches=occHabitats.size>0 && occHabitats.has(IDEAL_HABITAT[m]); return (
+              <button key={m} style={{...SB.row,...(matches?SB.rowOn:{})}} onClick={()=>{actions.assignToHouse(m,id); onClose();}}>
+                <Spr m={m} sz={24}/><span style={{flex:1,textAlign:"left",fontWeight:600}}>{m}</span><HabitatDot mon={m}/>
+                {matches?<span style={SB.rec}>matches</span>:null}
+              </button>
+            );})}
+          </div>
+        </React.Fragment>)}
+        <div style={SB.actionRow}><button style={SB.danger} onClick={()=>{actions.removeHouseBuilding(id); onClose();}}><Trash2 size={13}/> Remove this house</button></div>
+      </div>);
+    }
+  } else if(sheet.type==="groupHouse"){
+    const {habitat,mons}=sheet;
+    const meta=IDEAL_HABITAT_META[habitat]||{};
+    const stillUnassigned=mons.filter(m=>{ const p=place[m]; return p&&p.t==="house"&&p.a===area; });
+    title=`House the ${habitat} group`;
+    const fitCount=Math.min(stillUnassigned.length,4)||1;
+    const list=HOUSE_TYPES.filter(hh=>hh.cap>=fitCount);
+    node=(<div>
+      <div style={SB.reqLine}>{meta.e} {habitat} · {stillUnassigned.length} unassigned Pok\u00e9mon share this preference here: {stillUnassigned.join(", ")}</div>
+      <div style={SB.sectlabel}>Pick a house — the group moves in together, up to its capacity</div>
+      <div style={SB.list}>
+        {stillUnassigned.length===0 && <div style={SB.hint}>These Pok\u00e9mon have already been housed.</div>}
+        {list.map(hh=>(
+          <button key={hh.k} style={SB.row} onClick={()=>{actions.buildHouseForGroup(hh.k,stillUnassigned,area); onClose();}}>
+            <Home size={22} color="#5b6b5d"/>
+            <div style={{flex:1,textAlign:"left",minWidth:0}}><div style={{fontWeight:700,fontSize:13}}>{hh.n}</div></div>
+            <span style={SB.tag}>{hh.cap} {hh.cap===1?"resident":"residents"}</span>
+          </button>
+        ))}
+      </div>
+      {stillUnassigned.length>4 && <div style={SB.hint}>Houses top out at 4 residents — the rest of the group can go into a second house together.</div>}
+    </div>);
   } else if(sheet.type==="addHouse" || sheet.type==="addAny"){
     const any=sheet.type==="addAny";
     title=any? "Add any Pokémon to "+A.short : "Add a house resident — "+A.short;
@@ -430,6 +583,7 @@ function Sheet({sheet,area,A,pQuery,setPQuery,onClose,insts,occByInst,isBef,coun
   } else if(sheet.type==="poke"){
     const m=sheet.mon; title=m;
     const ids=Object.keys(insts).filter(id=>insts[id].area===area).sort((a,b)=>insts[a].hab-insts[b].hab);
+    const houseIds=Object.keys(houses).filter(id=>houses[id].area===area);
     node=(<div>
       <div style={SB.sectlabel}>Move to a habitat here</div>
       <div style={SB.list}>
@@ -439,6 +593,20 @@ function Sheet({sheet,area,A,pQuery,setPQuery,onClose,insts,occByInst,isBef,coun
             <img src={HAB_IMG(habN)} alt="" referrerPolicy="no-referrer" style={{width:34,height:26,objectFit:"contain"}} onError={e=>{e.currentTarget.style.display="none";}}/>
             <span style={{flex:1,textAlign:"left",fontWeight:600}}>#{habN} {HAB_INFO[habN].name}</span>{occ&&occ!==m?<span style={SB.tag}>has {occ}</span>:null}</button>);})}
       </div>
+      {houseIds.length>0 && (<React.Fragment>
+        <div style={SB.sectlabel}>Move into a house here</div>
+        <div style={SB.list}>
+          {houseIds.map(id=>{ const h=houses[id]; const occHere=(occByHouse[id]||[]).filter(mm=>mm!==m); const c=occHere.length; const full=c>=h.cap; const bt=HOUSE_BY[h.b];
+            const matches=occHere.length>0 && IDEAL_HABITAT[m] && occHere.some(mm=>IDEAL_HABITAT[mm]===IDEAL_HABITAT[m]); return (
+            <button key={id} style={{...SB.row,...(full?SB.rowDim:{}),...(matches&&!full?SB.rowOn:{})}} onClick={()=>{if(!full){actions.assignToHouse(m,id); onClose();}}}>
+              <Home size={20} color="#5b6b5d"/>
+              <span style={{flex:1,textAlign:"left",fontWeight:600}}>{bt?bt.n:h.b}</span>
+              {matches&&!full?<span style={SB.rec}>matches</span>:null}
+              <span style={SB.tag}>{c}/{h.cap}{full?" full":""}</span>
+            </button>
+          );})}
+        </div>
+      </React.Fragment>)}
       <div style={SB.actionRow}><button style={SB.danger} onClick={()=>{actions.unplace(m); onClose();}}><Trash2 size={13}/> Remove (not caught)</button></div>
     </div>);
   }
@@ -447,7 +615,7 @@ function Sheet({sheet,area,A,pQuery,setPQuery,onClose,insts,occByInst,isBef,coun
     <div style={SB.overlay} onClick={onClose}>
       <div style={SB.sheet} onClick={e=>e.stopPropagation()}>
         <div style={SB.head}><span style={SB.title}>{title}</span><button style={SB.close} onClick={onClose}><X size={16}/></button></div>
-        {(sheet.type==="addHab"||sheet.type==="addHouse"||sheet.type==="addAny") &&
+        {(sheet.type==="addHab"||sheet.type==="addHouse"||sheet.type==="addAny"||sheet.type==="addHouseBuilding") &&
           <div style={SB.search}><Search size={15} color="#9aa79b"/><input autoFocus style={SB.searchIn} placeholder="Search…" value={pQuery} onChange={e=>setPQuery(e.target.value)}/></div>}
         <div style={SB.body}>{node}</div>
       </div>
@@ -547,6 +715,7 @@ const S={
   addTile:{border:"1.5px dashed #cdd6cc",borderRadius:13,background:"rgba(255,255,255,.5)",color:"#5b6b5d",fontFamily:FONT,fontWeight:700,fontSize:13,cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:5,minHeight:110},
   houseBin:{display:"flex",flexWrap:"wrap",gap:7,background:"rgba(255,255,255,.5)",border:"1.5px dashed #d7dfd6",borderRadius:12,padding:10,minHeight:44,alignItems:"center"},
   addHouse:{display:"inline-flex",alignItems:"center",gap:4,fontFamily:FONT,fontSize:12,fontWeight:700,color:"#5b6b5d",background:"#fff",border:"1px solid #dbe2da",borderRadius:20,padding:"6px 11px",cursor:"pointer"},
+  houseRecCard:{display:"flex",alignItems:"center",gap:10,background:"#fff",border:"1px solid #e4ebe2",borderRadius:12,padding:"9px 12px",cursor:"pointer",fontFamily:FONT,textAlign:"left",width:"100%"},
   palette:{display:"flex",flexWrap:"wrap",gap:7,marginTop:2},
   pchip:{display:"inline-flex",alignItems:"center",gap:5,fontFamily:FONT,fontSize:12.5,fontWeight:600,border:"1.5px solid",borderRadius:20,padding:"4px 10px 4px 5px",cursor:"pointer"},
   pname:{maxWidth:120,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"},
