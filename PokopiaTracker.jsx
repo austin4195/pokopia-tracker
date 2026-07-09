@@ -137,7 +137,7 @@ function findBetterHouse(mon,currentHouseId,areaKey,houses,occByHouse){
   return emptyFallback;
 }
 
-const VERSION="v6.3.0", BUILD="2026-07-07";
+const VERSION="v6.4.0", BUILD="2026-07-07";
 const V6="pokopia:tracker:v6", V5="pokopia:tracker:v5", V4="pokopia:tracker:v4", V3="pokopia:tracker:v3", V2="pokopia:tracker:v2", V1="pokopia:tracker";
 function boardAreaFor(mon){ const a=AREA_OF[mon]; return AREA_BY[a] && !AREA_BY[a].special ? a : null; }
 function v3ToV4(v3){ const built={},place={},extra={}; const habs=v3.habitats||{};
@@ -500,7 +500,7 @@ export default function PokopiaTracker(){
         </footer>
       </div>
 
-      {sheet && <Sheet key={sheet.type+"|"+(sheet.mon||sheet.id||sheet.habitat||"")} sheet={sheet} area={area} A={A} pQuery={pQuery} setPQuery={setPQuery} onClose={()=>setSheet(null)}
+      {sheet && <Sheet key={sheet.type+"|"+(sheet.mon||sheet.id||sheet.habitat||"")} sheet={sheet} area={area} A={A} pQuery={pQuery} setPQuery={setPQuery} onClose={()=>setSheet(null)} goTo={(s)=>setSheet(s)} seq={st.seq}
         insts={insts} houses={houses} customTypes={customTypes} occByInst={occByInst} occByHouse={occByHouse} isBef={isBef} countByHab={countByHab} place={place}
         actions={{addInstance,removeInstance,setOccupant,clearOccupant,addHouse,moveToInstance,buildAndOccupy,unplace,
                   addHouseBuilding,removeHouseBuilding,assignToHouse,unassignHouse,buildHouseForGroup,addCustomHouse}}/>}
@@ -511,7 +511,7 @@ export default function PokopiaTracker(){
 function Spr({m,sz=20}){ const u=SPRITE_URL(m); if(!u) return null; return <img src={u} alt="" loading="lazy" referrerPolicy="no-referrer" style={{width:sz,height:sz,objectFit:"contain",flexShrink:0}} onError={e=>{e.currentTarget.style.visibility="hidden";}}/>; }
 function HabitatDot({mon,sz=11}){ const h=IDEAL_HABITAT[mon]; if(!h) return null; const meta=IDEAL_HABITAT_META[h]||{}; return <span title={h+" habitat"} style={{fontSize:sz,lineHeight:1}}>{meta.e}</span>; }
 
-function Sheet({sheet,area,A,pQuery,setPQuery,onClose,insts,houses,customTypes,occByInst,occByHouse,isBef,countByHab,place,actions}){
+function Sheet({sheet,area,A,pQuery,setPQuery,onClose,goTo,seq,insts,houses,customTypes,occByInst,occByHouse,isBef,countByHab,place,actions}){
   const q=pQuery.trim().toLowerCase();
   const allPoke=Object.keys(SPRITE_ID);
   const areaIdsOf=(habN)=> Object.keys(insts).filter(id=>insts[id].area===area && insts[id].hab===+habN);
@@ -558,12 +558,12 @@ function Sheet({sheet,area,A,pQuery,setPQuery,onClose,insts,houses,customTypes,o
     const custEntries=Object.entries(customTypes||{}).filter(([k,c])=>!q||c.n.toLowerCase().includes(q));
     const list=HOUSE_TYPES.filter(h=>!q||h.n.toLowerCase().includes(q));
     node=(<div>
-      <button style={SB.customAdd} onClick={()=>setSheet({type:"addCustomType"})}><Plus size={16}/> Add a custom house type</button>
+      <button style={SB.customAdd} onClick={()=>goTo({type:"addCustomType"})}><Plus size={16}/> Add a custom house type</button>
       {custEntries.length>0 && (<React.Fragment>
         <div style={SB.sectlabel}>Your custom houses</div>
         <div style={SB.list}>
           {custEntries.map(([k,c])=>(
-            <button key={k} style={SB.row} onClick={()=>{actions.addHouseBuilding(k,area); onClose();}}>
+            <button key={k} style={SB.row} onClick={()=>{ const newId="H"+seq; actions.addHouseBuilding(k,area); goTo({type:"house",id:newId}); }}>
               <Home size={22} color="#5b6b5d"/>
               <div style={{flex:1,textAlign:"left",minWidth:0}}><div style={{fontWeight:700,fontSize:13}}>{c.n}</div></div>
               <span style={SB.tag}>{c.cap} {c.cap===1?"resident":"residents"}</span>
@@ -574,7 +574,7 @@ function Sheet({sheet,area,A,pQuery,setPQuery,onClose,insts,houses,customTypes,o
       <div style={SB.sectlabel}>Standard houses</div>
       <div style={SB.list}>
         {list.map(h=>(
-          <button key={h.k} style={SB.row} onClick={()=>{actions.addHouseBuilding(h.k,area); onClose();}}>
+          <button key={h.k} style={SB.row} onClick={()=>{ const newId="H"+seq; actions.addHouseBuilding(h.k,area); goTo({type:"house",id:newId}); }}>
             <Home size={22} color="#5b6b5d"/>
             <div style={{flex:1,textAlign:"left",minWidth:0}}><div style={{fontWeight:700,fontSize:13}}>{h.n}</div></div>
             <span style={SB.tag}>{h.cap} {h.cap===1?"resident":"residents"}</span>
@@ -597,7 +597,7 @@ function Sheet({sheet,area,A,pQuery,setPQuery,onClose,insts,houses,customTypes,o
       </div>
       <div style={SB.actionRow}>
         <button style={{...SB.primary,opacity:(!customName.trim()||!(+customCap>0))?0.5:1}} disabled={!customName.trim()||!(+customCap>0)}
-          onClick={()=>{ const capN=Math.max(1,Math.min(20,Math.round(+customCap))); actions.addCustomHouse(customName.trim(),capN,area); onClose(); }}>
+          onClick={()=>{ const capN=Math.max(1,Math.min(20,Math.round(+customCap))); const newId="H"+(seq+1); actions.addCustomHouse(customName.trim(),capN,area); goTo({type:"house",id:newId}); }}>
           <Plus size={14}/> Build it
         </button>
       </div>
@@ -610,7 +610,9 @@ function Sheet({sheet,area,A,pQuery,setPQuery,onClose,insts,houses,customTypes,o
       const occ=occByHouse[id]||[];
       const occHabitats=new Set(occ.map(m=>IDEAL_HABITAT[m]).filter(Boolean));
       const mismatchInfo=houseMismatchInfo(occ);
-      const candidates=Object.keys(place).filter(m=>{ const p=place[m]; return p.t==="house"&&p.a===area; })
+      const unhoused=Object.keys(place).filter(m=>{ const p=place[m]; return p.t==="house"&&p.a===area; })
+        .sort((a,b)=>{ const am=occHabitats.has(IDEAL_HABITAT[a])?0:1, bm=occHabitats.has(IDEAL_HABITAT[b])?0:1; return am-bm; });
+      const inHabitat=Object.keys(place).filter(m=>{ const p=place[m]; return p.t==="h" && insts[p.i] && insts[p.i].area===area; })
         .sort((a,b)=>{ const am=occHabitats.has(IDEAL_HABITAT[a])?0:1, bm=occHabitats.has(IDEAL_HABITAT[b])?0:1; return am-bm; });
       node=(<div>
         <div style={SB.reqLine}>{occ.length} / {h.cap} residents
@@ -645,16 +647,29 @@ function Sheet({sheet,area,A,pQuery,setPQuery,onClose,insts,houses,customTypes,o
           })}
         </div>
         {occ.length<h.cap && (<React.Fragment>
-          <div style={SB.sectlabel}>Add resident (unassigned in {A.short})</div>
+          <div style={SB.sectlabel}>Add resident — unhoused in {A.short}</div>
           <div style={SB.list}>
-            {candidates.length===0 && <div style={SB.hint}>No unassigned Pok\u00e9mon here yet — add one from the Unassigned bin first.</div>}
-            {candidates.map(m=>{ const matches=occHabitats.size>0 && occHabitats.has(IDEAL_HABITAT[m]); return (
+            {unhoused.length===0 && <div style={SB.hint}>No unhoused Pok\u00e9mon here yet — add one from the Unassigned bin first.</div>}
+            {unhoused.map(m=>{ const matches=occHabitats.size>0 && occHabitats.has(IDEAL_HABITAT[m]); return (
               <button key={m} style={{...SB.row,...(matches?SB.rowOn:{})}} onClick={()=>{actions.assignToHouse(m,id); onClose();}}>
                 <Spr m={m} sz={24}/><span style={{flex:1,textAlign:"left",fontWeight:600}}>{m}</span><HabitatDot mon={m}/>
                 {matches?<span style={SB.rec}>matches</span>:null}
               </button>
             );})}
           </div>
+          {inHabitat.length>0 && (<React.Fragment>
+            <div style={SB.divider}/>
+            <div style={SB.sectlabel}>Add resident — currently in a habitat here</div>
+            <div style={SB.list}>
+              {inHabitat.map(m=>{ const matches=occHabitats.size>0 && occHabitats.has(IDEAL_HABITAT[m]); return (
+                <button key={m} style={{...SB.row,...(matches?SB.rowOn:{})}} onClick={()=>{actions.assignToHouse(m,id); onClose();}}>
+                  <Spr m={m} sz={24}/><span style={{flex:1,textAlign:"left",fontWeight:600}}>{m}</span><HabitatDot mon={m}/>
+                  {matches?<span style={SB.rec}>matches</span>:null}
+                  <span style={SB.tag}>frees habitat</span>
+                </button>
+              );})}
+            </div>
+          </React.Fragment>)}
         </React.Fragment>)}
         <div style={SB.actionRow}><button style={SB.danger} onClick={()=>{actions.removeHouseBuilding(id); onClose();}}><Trash2 size={13}/> Remove this house</button></div>
       </div>);
@@ -902,6 +917,7 @@ const SB={
   rowBad:{display:"flex",alignItems:"center",gap:10,width:"100%",background:"#FBF4E8",border:"1px solid #f0d9b5",borderRadius:10,padding:"9px 11px",fontFamily:FONT,fontSize:13.5,color:"#2f3a30",boxSizing:"border-box"},
   badTag:{fontSize:10,fontWeight:800,color:"#B9743A",background:"#F4E9DA",borderRadius:20,padding:"1px 7px",whiteSpace:"nowrap"},
   moveBtn:{fontFamily:FONT,fontSize:11.5,fontWeight:700,color:"#fff",background:"#B9743A",border:"none",borderRadius:8,padding:"6px 9px",cursor:"pointer",whiteSpace:"nowrap"},
+  divider:{height:1,background:"#eef1ec",margin:"10px 2px"},
   customAdd:{display:"flex",alignItems:"center",justifyContent:"center",gap:6,width:"100%",fontFamily:FONT,fontSize:13,fontWeight:700,color:"#3E9A60",background:"#E0F1E5",border:"none",borderRadius:10,padding:"10px 13px",cursor:"pointer",margin:"2px 0 10px"},
   formRow:{display:"flex",flexDirection:"column",gap:5,margin:"10px 2px"},
   formLabel:{fontSize:11.5,fontWeight:800,color:"#8a958b",textTransform:"uppercase",letterSpacing:.4},
