@@ -137,7 +137,7 @@ function findBetterHouse(mon,currentHouseId,areaKey,houses,occByHouse){
   return emptyFallback;
 }
 
-const VERSION="v6.4.0", BUILD="2026-07-07";
+const VERSION="v6.4.1", BUILD="2026-07-08";
 const V6="pokopia:tracker:v6", V5="pokopia:tracker:v5", V4="pokopia:tracker:v4", V3="pokopia:tracker:v3", V2="pokopia:tracker:v2", V1="pokopia:tracker";
 function boardAreaFor(mon){ const a=AREA_OF[mon]; return AREA_BY[a] && !AREA_BY[a].special ? a : null; }
 function v3ToV4(v3){ const built={},place={},extra={}; const habs=v3.habitats||{};
@@ -161,7 +161,15 @@ function v4ToV5(v4){ let seq=1; const insts={},place={},extra={...(v4.extra||{})
 function v5ToV6(v5){ return {seq:v5.seq||1, insts:v5.insts||{}, houses:{}, customTypes:{}, place:v5.place||{}, extra:v5.extra||{}}; }
 const EMPTY={seq:1,insts:{},houses:{},customTypes:{},place:{},extra:{}};
 
-async function getKey(k){ try{ if(window.storage){ const r=await window.storage.get(k); if(r&&r.value) return JSON.parse(r.value);} }catch(e){} return null; }
+/* Persistence: real browsers (this is a standalone GitHub Pages app) don't have window.storage —
+   that API only exists inside Claude.ai's Artifacts iframe. localStorage is the actual persistence
+   layer here; window.storage is checked first only so this still works if ever previewed as an Artifact. */
+function hasClaudeStorage(){ try{ return !!(window.storage && typeof window.storage.get==="function"); }catch(e){ return false; } }
+async function getKey(k){
+  try{ if(hasClaudeStorage()){ const r=await window.storage.get(k); return (r&&r.value)?JSON.parse(r.value):null; } }catch(e){}
+  try{ const raw=localStorage.getItem(k); return raw?JSON.parse(raw):null; }catch(e){}
+  return null;
+}
 async function loadState(){
   const v6=await getKey(V6); if(v6) return {seq:v6.seq||1, insts:v6.insts||{}, houses:v6.houses||{}, customTypes:v6.customTypes||{}, place:v6.place||{}, extra:v6.extra||{}};
   const v5=await getKey(V5); if(v5) return v5ToV6({seq:v5.seq||1, insts:v5.insts||{}, place:v5.place||{}, extra:v5.extra||{}});
@@ -171,7 +179,11 @@ async function loadState(){
   const v1=await getKey(V1); if(v1&&v1.befriended) return v5ToV6(v4ToV5(v1ToV4(v1)));
   return {...EMPTY};
 }
-async function saveState(s){ try{ if(window.storage) await window.storage.set(V6, JSON.stringify(s)); }catch(e){} }
+async function saveState(s){
+  const json=JSON.stringify(s);
+  try{ if(hasClaudeStorage()){ await window.storage.set(V6, json); return; } }catch(e){}
+  try{ localStorage.setItem(V6, json); }catch(e){}
+}
 
 export default function PokopiaTracker(){
   const [st,setSt]=useState(EMPTY);
@@ -240,7 +252,9 @@ export default function PokopiaTracker(){
   const toggleExtra=(mon)=> setSt(s=>{ const extra={...s.extra}; if(extra[mon]) delete extra[mon]; else extra[mon]=true; return {...s,extra}; });
   const resetAll=()=>{ if(typeof confirm!=="undefined" && !confirm("Wipe ALL your logged data and start over? This can't be undone.")) return;
     setSt({...EMPTY});
-    try{ if(window.storage&&window.storage.delete){ [V5,V4,V3,V2,V1].forEach(k=>window.storage.delete(k)); } }catch(e){} };
+    const keys=[V6,V5,V4,V3,V2,V1];
+    try{ if(hasClaudeStorage()){ keys.forEach(k=>window.storage.delete(k)); } }catch(e){}
+    try{ keys.forEach(k=>localStorage.removeItem(k)); }catch(e){} };
 
   /* ---- recommendations (instance-aware, scoped to area) ---- */
   const recs=useMemo(()=>{
