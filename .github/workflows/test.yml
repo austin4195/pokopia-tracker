@@ -1,0 +1,30 @@
+name: Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch: {}
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - run: npm install
+
+      # Catches JSX/JS syntax errors and broken imports before they ever reach GitHub Pages.
+      - name: Verify PokopiaTracker.jsx compiles
+        run: npm run build-check
+
+      # These run against the ACTUAL PokopiaTracker.jsx (see tests/extract.mjs) — not a
+      # hand-copied mirror of the logic — so they can't silently drift out of sync with
+      # what's actually shipped.
+      - name: Run tests
+        run: npm test
