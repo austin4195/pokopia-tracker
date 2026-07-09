@@ -109,7 +109,35 @@ const IDEAL_HABITAT_META = {
   Warm:{e:"\u{1F525}",c:"#B9743A"}, Dry:{e:"\u{1F3DC}\uFE0F",c:"#9a5c3e"}, Cool:{e:"\u2744\uFE0F",c:"#5689AE"},
 };
 
-const VERSION="v6.1.0", BUILD="2026-07-07";
+/* Is a house's household of Ideal Habitats harmonious, and if not, who doesn't fit the majority preference? */
+function houseMismatchInfo(occ){
+  const counts={};
+  for(const m of occ){ const h=IDEAL_HABITAT[m]; if(!h) continue; counts[h]=(counts[h]||0)+1; }
+  const cats=Object.keys(counts);
+  if(cats.length<=1) return {mixed:false, majority:cats[0]||null, mismatched:new Set()};
+  const maxCount=Math.max(...cats.map(c=>counts[c]));
+  const majorityCats=cats.filter(c=>counts[c]===maxCount);
+  const majority=majorityCats.length===1?majorityCats[0]:null;
+  const mismatched=new Set();
+  for(const m of occ){ const h=IDEAL_HABITAT[m]; if(!h) continue; if(!majority||h!==majority) mismatched.add(m); }
+  return {mixed:true, majority, mismatched};
+}
+/* Find another house in the same area that already matches (or is empty and would trivially match) a mon's Ideal Habitat and has room. */
+function findBetterHouse(mon,currentHouseId,areaKey,houses,occByHouse){
+  const want=IDEAL_HABITAT[mon]; if(!want) return null;
+  let emptyFallback=null;
+  for(const id of Object.keys(houses)){
+    if(id===currentHouseId) continue;
+    const h=houses[id]; if(h.area!==areaKey) continue;
+    const occ=occByHouse[id]||[]; if(occ.length>=h.cap) continue;
+    if(occ.length===0){ if(!emptyFallback) emptyFallback=id; continue; }
+    const others=occ.map(m=>IDEAL_HABITAT[m]).filter(Boolean);
+    if(others.length>0 && others.every(x=>x===want)) return id;
+  }
+  return emptyFallback;
+}
+
+const VERSION="v6.3.0", BUILD="2026-07-07";
 const V6="pokopia:tracker:v6", V5="pokopia:tracker:v5", V4="pokopia:tracker:v4", V3="pokopia:tracker:v3", V2="pokopia:tracker:v2", V1="pokopia:tracker";
 function boardAreaFor(mon){ const a=AREA_OF[mon]; return AREA_BY[a] && !AREA_BY[a].special ? a : null; }
 function v3ToV4(v3){ const built={},place={},extra={}; const habs=v3.habitats||{};
@@ -130,12 +158,12 @@ function v4ToV5(v4){ let seq=1; const insts={},place={},extra={...(v4.extra||{})
     if(p.t==="h"){ const id=habToId[String(p.n)]; if(id) place[m]={t:"h",i:id}; else place[m]={t:"house",a:HAB_AREA[p.n]||"WASTELAND"}; }
     else place[m]=p; }
   return {seq,insts,place,extra}; }
-function v5ToV6(v5){ return {seq:v5.seq||1, insts:v5.insts||{}, houses:{}, place:v5.place||{}, extra:v5.extra||{}}; }
-const EMPTY={seq:1,insts:{},houses:{},place:{},extra:{}};
+function v5ToV6(v5){ return {seq:v5.seq||1, insts:v5.insts||{}, houses:{}, customTypes:{}, place:v5.place||{}, extra:v5.extra||{}}; }
+const EMPTY={seq:1,insts:{},houses:{},customTypes:{},place:{},extra:{}};
 
 async function getKey(k){ try{ if(window.storage){ const r=await window.storage.get(k); if(r&&r.value) return JSON.parse(r.value);} }catch(e){} return null; }
 async function loadState(){
-  const v6=await getKey(V6); if(v6) return {seq:v6.seq||1, insts:v6.insts||{}, houses:v6.houses||{}, place:v6.place||{}, extra:v6.extra||{}};
+  const v6=await getKey(V6); if(v6) return {seq:v6.seq||1, insts:v6.insts||{}, houses:v6.houses||{}, customTypes:v6.customTypes||{}, place:v6.place||{}, extra:v6.extra||{}};
   const v5=await getKey(V5); if(v5) return v5ToV6({seq:v5.seq||1, insts:v5.insts||{}, place:v5.place||{}, extra:v5.extra||{}});
   const v4=await getKey(V4); if(v4) return v5ToV6(v4ToV5(v4));
   const v3=await getKey(V3); if(v3) return v5ToV6(v4ToV5(v3ToV4(v3)));
@@ -156,7 +184,8 @@ export default function PokopiaTracker(){
   const [view,setView]=useState("island");
   const [specScope,setSpecScope]=useState("area");
   const importRef=useRef();
-  const {insts,houses,place,extra}=st;
+  const {insts,houses,customTypes,place,extra}=st;
+  const buildingLabel=(key)=> (customTypes&&customTypes[key]&&customTypes[key].n) || (HOUSE_BY[key]&&HOUSE_BY[key].n) || key;
 
   useEffect(()=>{ loadState().then(s=>{ setSt(s); setLoaded(true); }); },[]);
   useEffect(()=>{ if(loaded) saveState(st); },[st,loaded]);
@@ -174,15 +203,28 @@ export default function PokopiaTracker(){
   const setOccupant=(id,mon)=> setSt(s=>{ const place={...s.place}; const prev=Object.keys(place).find(m=>place[m].t==="h"&&place[m].i===id); if(prev&&prev!==mon) place[prev]={t:"house",a:s.insts[id].area}; place[mon]={t:"h",i:id}; return {...s,place}; });
   const clearOccupant=(id)=> setSt(s=>{ const place={...s.place}; const occ=Object.keys(place).find(m=>place[m].t==="h"&&place[m].i===id); if(occ) place[occ]={t:"house",a:s.insts[id].area}; return {...s,place}; });
   const addHouse=(mon,areaKey)=> setSt(s=>({...s, place:{...s.place,[mon]:{t:"house",a:areaKey}}}));
-  const addHouseBuilding=(buildingKey,areaKey)=> setSt(s=>{ const id="H"+s.seq; const b=HOUSE_BY[buildingKey]; const cap=b?b.cap:1; return {...s, seq:s.seq+1, houses:{...s.houses,[id]:{b:buildingKey,area:areaKey,cap}}}; });
+  const addHouseBuilding=(buildingKey,areaKey)=> setSt(s=>{ const id="H"+s.seq; const meta=(s.customTypes&&s.customTypes[buildingKey])||HOUSE_BY[buildingKey]; const cap=meta?meta.cap:1; return {...s, seq:s.seq+1, houses:{...s.houses,[id]:{b:buildingKey,area:areaKey,cap}}}; });
+  const addCustomHouse=(name,cap,areaKey)=> setSt(s=>{
+    const typeKey="c"+s.seq; const id="H"+(s.seq+1);
+    return {...s, seq:s.seq+2,
+      customTypes:{...s.customTypes,[typeKey]:{n:name,cap}},
+      houses:{...s.houses,[id]:{b:typeKey,area:areaKey,cap}}};
+  });
   const removeHouseBuilding=(id)=> setSt(s=>{ const h=s.houses[id]; if(!h) return s; const place={...s.place}; for(const m of Object.keys(place)){ const p=place[m]; if(p.t==="house"&&p.h===id) place[m]={t:"house",a:h.area}; } const houses={...s.houses}; delete houses[id]; return {...s,houses,place}; });
   const assignToHouse=(mon,houseId)=> setSt(s=>{ const h=s.houses[houseId]; if(!h) return s; const occCount=Object.keys(s.place).filter(m=>{ const p=s.place[m]; return p.t==="house"&&p.h===houseId&&m!==mon; }).length; if(occCount>=h.cap) return s; return {...s, place:{...s.place,[mon]:{t:"house",h:houseId}}}; });
   const unassignHouse=(mon)=> setSt(s=>{ const p=s.place[mon]; if(!p||p.t!=="house"||!p.h) return s; const h=s.houses[p.h]; return {...s, place:{...s.place,[mon]:{t:"house",a:h?h.area:"WASTELAND"}}}; });
   const buildHouseForGroup=(buildingKey,mons,areaKey)=> setSt(s=>{
-    const id="H"+s.seq; const b=HOUSE_BY[buildingKey]; const cap=b?b.cap:1;
+    const id="H"+s.seq; const meta=(s.customTypes&&s.customTypes[buildingKey])||HOUSE_BY[buildingKey]; const cap=meta?meta.cap:1;
     const houses={...s.houses,[id]:{b:buildingKey,area:areaKey,cap}};
     const place={...s.place}; let count=0;
-    for(const m of mons){ if(count>=cap) break; if(!place[m]||place[m].t!=="house"||place[m].h) continue; place[m]={t:"house",h:id}; count++; }
+    for(const m of mons){
+      if(count>=cap) break;
+      const p=place[m];
+      if(!p) continue;
+      if(p.t==="house" && p.h) continue; // already living in a different house — leave it alone
+      place[m]={t:"house",h:id}; // covers both "unassigned house" and "currently in a habitat" (frees the habitat slot)
+      count++;
+    }
     return {...s, seq:s.seq+1, houses, place};
   });
   const moveToInstance=(mon,id)=> setSt(s=>{ const place={...s.place}; const prev=Object.keys(place).find(m=>place[m].t==="h"&&place[m].i===id); if(prev&&prev!==mon) place[prev]={t:"house",a:s.insts[id].area}; place[mon]={t:"h",i:id}; return {...s,place}; });
@@ -216,15 +258,31 @@ export default function PokopiaTracker(){
 
   const houseRecs=useMemo(()=>{
     const a=AREA_BY[area]; if(!a || a.special) return [];
-    const unassigned=Object.keys(place).filter(m=>{ const p=place[m]; return p.t==="house"&&p.a===area; });
+    const pool=[];
+    for(const m of Object.keys(place)){
+      const p=place[m];
+      if(p.t==="house" && p.a===area) pool.push(m);
+      else if(p.t==="h" && insts[p.i] && insts[p.i].area===area) pool.push(m);
+    }
     const groups={};
-    for(const m of unassigned){ const h=IDEAL_HABITAT[m]; if(!h) continue; (groups[h]=groups[h]||[]).push(m); }
+    for(const m of pool){ const h=IDEAL_HABITAT[m]; if(!h) continue; (groups[h]=groups[h]||[]).push(m); }
     return Object.keys(groups).filter(h=>groups[h].length>=2).map(h=>({habitat:h,mons:groups[h]})).sort((a,b)=>b.mons.length-a.mons.length);
-  },[place,area]);
+  },[place,area,insts]);
+
+  const mixedHouses=useMemo(()=>{
+    const out=[];
+    for(const id of Object.keys(houses)){
+      if(houses[id].area!==area) continue;
+      const occ=occByHouse[id]||[]; if(occ.length<2) continue;
+      const info=houseMismatchInfo(occ);
+      if(info.mixed && info.mismatched.size>0) out.push({id,occ,info});
+    }
+    return out;
+  },[houses,occByHouse,area]);
 
   const exportProgress=()=>{ try{ const blob=new Blob([JSON.stringify(st,null,2)],{type:"application/json"}); const u=URL.createObjectURL(blob); const a=document.createElement("a"); a.href=u; a.download="pokopia-progress.json"; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(u);}catch(e){} };
   const importProgress=(e)=>{ const f=e.target.files&&e.target.files[0]; if(!f) return; const r=new FileReader(); r.onload=()=>{ try{ const d=JSON.parse(r.result);
-      if(d.insts && d.houses!==undefined){ setSt({seq:d.seq||1,insts:d.insts||{},houses:d.houses||{},place:d.place||{},extra:d.extra||{}}); }
+      if(d.insts && d.houses!==undefined){ setSt({seq:d.seq||1,insts:d.insts||{},houses:d.houses||{},customTypes:d.customTypes||{},place:d.place||{},extra:d.extra||{}}); }
       else if(d.insts){ setSt(v5ToV6({seq:d.seq||1,insts:d.insts||{},place:d.place||{},extra:d.extra||{}})); }
       else if(d.built){ setSt(v5ToV6(v4ToV5(d))); }
       else if(d.befriended){ setSt(v5ToV6(v4ToV5(v3ToV4(d)))); }
@@ -360,28 +418,51 @@ export default function PokopiaTracker(){
 
             <div style={S.zoneLabel}><Home size={13} color={A.accent}/> Houses <span style={S.zc}>{areaHouseIds.length}</span></div>
             <div style={S.tileGrid}>
-              {areaHouseIds.map(id=>{ const h=houses[id]; const occ=occByHouse[id]||[]; const bt=HOUSE_BY[h.b];
+              {areaHouseIds.map(id=>{ const h=houses[id]; const occ=occByHouse[id]||[];
                 const habs=new Set(occ.map(m=>IDEAL_HABITAT[m]).filter(Boolean)); const shared=habs.size===1?[...habs][0]:null; return (
                 <div key={id} className="drop" style={{...S.tile, borderColor:occ.length?A.accent:"#e0e7df"}}
                   onDragOver={e=>e.preventDefault()} onDrop={e=>{const m=e.dataTransfer.getData("mon"); if(m) assignToHouse(m,id);}}
                   onClick={()=>setSheet({type:"house",id})}>
                   <div style={{...S.tileImg,display:"flex",alignItems:"center",justifyContent:"center"}}><Home size={26} color={A.accent}/></div>
-                  <div style={S.tileName}>{bt?bt.n:h.b}<span style={S.countPill}>{occ.length}/{h.cap}</span>{shared?<HabitatDot mon={occ[0]} sz={13}/>:null}</div>
-                  {occ.length ? (<div style={S.tileOcc}>{occ.slice(0,3).map(m=><Spr key={m} m={m} sz={18}/>)}{occ.length>3?<span style={{fontSize:11,fontWeight:700}}>+{occ.length-3}</span>:null}</div>)
-                              : (<div style={S.tileEmpty}>empty · tap to fill</div>)}
+                  <div style={S.tileName}>{buildingLabel(h.b)}<span style={S.countPill}>{occ.length}/{h.cap}</span>{shared?<HabitatDot mon={occ[0]} sz={13}/>:null}</div>
+                  {occ.length ? (
+                    <div style={S.tileOccList}>
+                      {occ.slice(0,3).map(m=>(<div key={m} style={S.tileOccRow}><Spr m={m} sz={16}/><span style={S.tileOccName}>{m}</span></div>))}
+                      {occ.length>3 && <div style={S.tileOccMore}>+{occ.length-3} more</div>}
+                    </div>
+                  ) : (<div style={S.tileEmpty}>empty · tap to fill</div>)}
                 </div>
               );})}
               <button style={S.addTile} onClick={()=>setSheet({type:"addHouseBuilding"})}><Plus size={18}/><span>Add house</span></button>
             </div>
 
+            {mixedHouses.length>0 && (<React.Fragment>
+              <div style={S.zoneLabel}><Home size={13} color="#B9743A"/> Mixed households <span style={S.zc}>{mixedHouses.length}</span></div>
+              <div style={{display:"flex",flexDirection:"column",gap:7,marginBottom:14}}>
+                {mixedHouses.map(({id,occ,info})=>(
+                  <button key={id} style={{...S.houseRecCard,borderColor:"#f0d9b5",background:"#FBF4E8"}} onClick={()=>setSheet({type:"house",id})}>
+                    <span style={{fontSize:18,lineHeight:1}}>\u26A0\uFE0F</span>
+                    <div style={{flex:1,minWidth:0,textAlign:"left"}}>
+                      <div style={{fontWeight:700,fontSize:13}}>{buildingLabel(houses[id].b)} · {info.mismatched.size} of {occ.length} don't match</div>
+                      <div style={{fontSize:12,color:"#5b6b5d",marginTop:2}}>
+                        {occ.map(m=>{ const hc=IDEAL_HABITAT[m]; const e=hc?IDEAL_HABITAT_META[hc].e:""; return (info.mismatched.has(m)?`${e} ${m}`:m); }).join(", ")}
+                      </div>
+                    </div>
+                    <span style={{...S.pctPill,color:"#B9743A",background:"#F4E9DA"}}>Sort out</span>
+                  </button>
+                ))}
+              </div>
+            </React.Fragment>)}
+
             {houseRecs.length>0 && (<React.Fragment>
               <div style={S.zoneLabel}><Sprout size={13} color={A.accent}/> Housemate matches <span style={S.zc}>{houseRecs.length}</span></div>
               <div style={{display:"flex",flexDirection:"column",gap:7,marginBottom:14}}>
-                {houseRecs.map(g=>{ const meta=IDEAL_HABITAT_META[g.habitat]||{}; return (
+                {houseRecs.map(g=>{ const meta=IDEAL_HABITAT_META[g.habitat]||{};
+                  const inHabitat=g.mons.filter(m=>{ const p=place[m]; return p.t==="h"; }).length; return (
                   <button key={g.habitat} style={S.houseRecCard} onClick={()=>setSheet({type:"groupHouse",habitat:g.habitat,mons:g.mons})}>
                     <span style={{fontSize:18,lineHeight:1}}>{meta.e}</span>
                     <div style={{flex:1,minWidth:0,textAlign:"left"}}>
-                      <div style={{fontWeight:700,fontSize:13}}>{g.habitat} · {g.mons.length} unassigned like it here</div>
+                      <div style={{fontWeight:700,fontSize:13}}>{g.habitat} · {g.mons.length} like it here{inHabitat?` (${inHabitat} in habitats)`:""}</div>
                       <div style={{fontSize:12,color:"#5b6b5d",marginTop:2}}>{g.mons.slice(0,6).join(", ")}{g.mons.length>6?` +${g.mons.length-6}`:""}</div>
                     </div>
                     <span style={S.pctPill}>House them</span>
@@ -414,15 +495,15 @@ export default function PokopiaTracker(){
         )}
 
         <footer style={S.footer}>
-          Tap a recommended Pokémon to build the habitat it spawns from, or add it to a house. Each habitat tile is one built instance — add the same habitat twice to track two of them independently. Houses now work the same way: add a house building, then assign residents up to its capacity — "Housemate matches" suggests groups that share an Ideal Habitat preference. Placed anywhere = befriended. Lists are recommendations only; “Any Pokémon” puts anyone anywhere. Saves automatically on this device.
+          Tap a recommended Pokémon to build the habitat it spawns from, or add it to a house. Each habitat tile is one built instance — add the same habitat twice to track two of them independently. Houses now work the same way: add a house building, then assign residents up to its capacity — don't see yours listed? Add a custom house type with whatever capacity the game shows you. "Housemate matches" suggests groups that share an Ideal Habitat preference, including Pokémon currently living in a habitat who could move into a house instead; "Mixed households" flags houses where residents don't share a preference and offers a one-tap move to somewhere that fits. Placed anywhere = befriended. Lists are recommendations only; “Any Pokémon” puts anyone anywhere. Saves automatically on this device.
           <div style={{marginTop:9,paddingTop:9,borderTop:"1px solid #e7ece5",color:"#a4b0a5"}}>Pokopia Tracker <b style={{color:"#7d8a7e"}}>{VERSION}</b> · built {BUILD} · made with <b style={{color:"#7d8a7e"}}>Claude</b> (Anthropic)</div>
         </footer>
       </div>
 
-      {sheet && <Sheet sheet={sheet} area={area} A={A} pQuery={pQuery} setPQuery={setPQuery} onClose={()=>setSheet(null)}
-        insts={insts} houses={houses} occByInst={occByInst} occByHouse={occByHouse} isBef={isBef} countByHab={countByHab} place={place}
+      {sheet && <Sheet key={sheet.type+"|"+(sheet.mon||sheet.id||sheet.habitat||"")} sheet={sheet} area={area} A={A} pQuery={pQuery} setPQuery={setPQuery} onClose={()=>setSheet(null)}
+        insts={insts} houses={houses} customTypes={customTypes} occByInst={occByInst} occByHouse={occByHouse} isBef={isBef} countByHab={countByHab} place={place}
         actions={{addInstance,removeInstance,setOccupant,clearOccupant,addHouse,moveToInstance,buildAndOccupy,unplace,
-                  addHouseBuilding,removeHouseBuilding,assignToHouse,unassignHouse,buildHouseForGroup}}/>}
+                  addHouseBuilding,removeHouseBuilding,assignToHouse,unassignHouse,buildHouseForGroup,addCustomHouse}}/>}
     </div>
   );
 }
@@ -430,10 +511,13 @@ export default function PokopiaTracker(){
 function Spr({m,sz=20}){ const u=SPRITE_URL(m); if(!u) return null; return <img src={u} alt="" loading="lazy" referrerPolicy="no-referrer" style={{width:sz,height:sz,objectFit:"contain",flexShrink:0}} onError={e=>{e.currentTarget.style.visibility="hidden";}}/>; }
 function HabitatDot({mon,sz=11}){ const h=IDEAL_HABITAT[mon]; if(!h) return null; const meta=IDEAL_HABITAT_META[h]||{}; return <span title={h+" habitat"} style={{fontSize:sz,lineHeight:1}}>{meta.e}</span>; }
 
-function Sheet({sheet,area,A,pQuery,setPQuery,onClose,insts,houses,occByInst,occByHouse,isBef,countByHab,place,actions}){
+function Sheet({sheet,area,A,pQuery,setPQuery,onClose,insts,houses,customTypes,occByInst,occByHouse,isBef,countByHab,place,actions}){
   const q=pQuery.trim().toLowerCase();
   const allPoke=Object.keys(SPRITE_ID);
   const areaIdsOf=(habN)=> Object.keys(insts).filter(id=>insts[id].area===area && insts[id].hab===+habN);
+  const [customName,setCustomName]=useState("");
+  const [customCap,setCustomCap]=useState("");
+  const buildingLabel=(key)=> (customTypes&&customTypes[key]&&customTypes[key].n) || (HOUSE_BY[key]&&HOUSE_BY[key].n) || key;
   let title="", node=null;
 
   if(sheet.type==="addHab"){
@@ -471,37 +555,94 @@ function Sheet({sheet,area,A,pQuery,setPQuery,onClose,insts,houses,occByInst,occ
       </div>); }
   } else if(sheet.type==="addHouseBuilding"){
     title="Add a house to "+A.short;
+    const custEntries=Object.entries(customTypes||{}).filter(([k,c])=>!q||c.n.toLowerCase().includes(q));
     const list=HOUSE_TYPES.filter(h=>!q||h.n.toLowerCase().includes(q));
-    node=(<div style={SB.list}>
-      {list.map(h=>(
-        <button key={h.k} style={SB.row} onClick={()=>{actions.addHouseBuilding(h.k,area); onClose();}}>
-          <Home size={22} color="#5b6b5d"/>
-          <div style={{flex:1,textAlign:"left",minWidth:0}}><div style={{fontWeight:700,fontSize:13}}>{h.n}</div></div>
-          <span style={SB.tag}>{h.cap} {h.cap===1?"resident":"residents"}</span>
+    node=(<div>
+      <button style={SB.customAdd} onClick={()=>setSheet({type:"addCustomType"})}><Plus size={16}/> Add a custom house type</button>
+      {custEntries.length>0 && (<React.Fragment>
+        <div style={SB.sectlabel}>Your custom houses</div>
+        <div style={SB.list}>
+          {custEntries.map(([k,c])=>(
+            <button key={k} style={SB.row} onClick={()=>{actions.addHouseBuilding(k,area); onClose();}}>
+              <Home size={22} color="#5b6b5d"/>
+              <div style={{flex:1,textAlign:"left",minWidth:0}}><div style={{fontWeight:700,fontSize:13}}>{c.n}</div></div>
+              <span style={SB.tag}>{c.cap} {c.cap===1?"resident":"residents"}</span>
+            </button>
+          ))}
+        </div>
+      </React.Fragment>)}
+      <div style={SB.sectlabel}>Standard houses</div>
+      <div style={SB.list}>
+        {list.map(h=>(
+          <button key={h.k} style={SB.row} onClick={()=>{actions.addHouseBuilding(h.k,area); onClose();}}>
+            <Home size={22} color="#5b6b5d"/>
+            <div style={{flex:1,textAlign:"left",minWidth:0}}><div style={{fontWeight:700,fontSize:13}}>{h.n}</div></div>
+            <span style={SB.tag}>{h.cap} {h.cap===1?"resident":"residents"}</span>
+          </button>
+        ))}
+        {list.length===0 && <div style={SB.hint}>No matches.</div>}
+      </div>
+    </div>);
+  } else if(sheet.type==="addCustomType"){
+    title="Add a custom house";
+    node=(<div>
+      <div style={SB.hint}>Build it in-game first — Pokopia will tell you how many residents it holds. Enter that here.</div>
+      <div style={SB.formRow}>
+        <label style={SB.formLabel}>Name</label>
+        <input autoFocus value={customName} onChange={e=>setCustomName(e.target.value)} placeholder="e.g. Beach bungalow" style={SB.formInput}/>
+      </div>
+      <div style={SB.formRow}>
+        <label style={SB.formLabel}>Residents</label>
+        <input type="number" inputMode="numeric" min="1" max="20" value={customCap} onChange={e=>setCustomCap(e.target.value)} placeholder="e.g. 3" style={SB.formInput}/>
+      </div>
+      <div style={SB.actionRow}>
+        <button style={{...SB.primary,opacity:(!customName.trim()||!(+customCap>0))?0.5:1}} disabled={!customName.trim()||!(+customCap>0)}
+          onClick={()=>{ const capN=Math.max(1,Math.min(20,Math.round(+customCap))); actions.addCustomHouse(customName.trim(),capN,area); onClose(); }}>
+          <Plus size={14}/> Build it
         </button>
-      ))}
-      {list.length===0 && <div style={SB.hint}>No matches.</div>}
+      </div>
     </div>);
   } else if(sheet.type==="house"){
     const id=sheet.id; const h=houses[id];
     if(!h){ node=<div style={SB.hint}>This house was removed.</div>; }
     else {
-      const bt=HOUSE_BY[h.b]; title=bt?bt.n:h.b;
+      const bt=buildingLabel(h.b); title=bt;
       const occ=occByHouse[id]||[];
       const occHabitats=new Set(occ.map(m=>IDEAL_HABITAT[m]).filter(Boolean));
+      const mismatchInfo=houseMismatchInfo(occ);
       const candidates=Object.keys(place).filter(m=>{ const p=place[m]; return p.t==="house"&&p.a===area; })
         .sort((a,b)=>{ const am=occHabitats.has(IDEAL_HABITAT[a])?0:1, bm=occHabitats.has(IDEAL_HABITAT[b])?0:1; return am-bm; });
       node=(<div>
-        <div style={SB.reqLine}>{occ.length} / {h.cap} residents{occHabitats.size===1?<React.Fragment> · <HabitatDot mon={occ[0]} sz={12}/> {[...occHabitats][0]} household</React.Fragment>:null}</div>
+        <div style={SB.reqLine}>{occ.length} / {h.cap} residents
+          {occHabitats.size===1?<React.Fragment> · <HabitatDot mon={occ[0]} sz={12}/> {[...occHabitats][0]} household</React.Fragment>:null}
+          {mismatchInfo.mixed?<React.Fragment> · <span style={{color:"#B9743A",fontWeight:700}}>{mismatchInfo.mismatched.size} don't match</span></React.Fragment>:null}
+        </div>
         <div style={SB.sectlabel}>Residents</div>
         <div style={SB.list}>
           {occ.length===0 && <div style={SB.hint}>No one lives here yet.</div>}
-          {occ.map(m=>(
-            <button key={m} style={SB.row} onClick={()=>{actions.unassignHouse(m); onClose();}}>
-              <Spr m={m} sz={24}/><span style={{flex:1,textAlign:"left",fontWeight:600}}>{m}</span><HabitatDot mon={m}/>
-              <span style={SB.tag}>tap to unassign</span>
-            </button>
-          ))}
+          {occ.map(m=>{
+            const bad=mismatchInfo.mismatched.has(m);
+            if(!bad){
+              return (
+                <button key={m} style={SB.row} onClick={()=>{actions.unassignHouse(m); onClose();}}>
+                  <Spr m={m} sz={24}/><span style={{flex:1,textAlign:"left",fontWeight:600}}>{m}</span><HabitatDot mon={m}/>
+                  <span style={SB.tag}>tap to unassign</span>
+                </button>
+              );
+            }
+            const better=findBetterHouse(m,id,area,houses,occByHouse);
+            return (
+              <div key={m} style={SB.rowBad}>
+                <Spr m={m} sz={24}/><span style={{flex:1,textAlign:"left",fontWeight:600}}>{m}</span><HabitatDot mon={m}/>
+                <span style={SB.badTag}>doesn't match</span>
+                {better ? (
+                  <button style={SB.moveBtn} onClick={()=>{actions.assignToHouse(m,better); onClose();}}>Move to {buildingLabel(houses[better].b)}</button>
+                ) : (
+                  <button style={SB.moveBtn} onClick={()=>{actions.unassignHouse(m); onClose();}}>Unassign</button>
+                )}
+              </div>
+            );
+          })}
         </div>
         {occ.length<h.cap && (<React.Fragment>
           <div style={SB.sectlabel}>Add resident (unassigned in {A.short})</div>
@@ -521,24 +662,34 @@ function Sheet({sheet,area,A,pQuery,setPQuery,onClose,insts,houses,occByInst,occ
   } else if(sheet.type==="groupHouse"){
     const {habitat,mons}=sheet;
     const meta=IDEAL_HABITAT_META[habitat]||{};
-    const stillUnassigned=mons.filter(m=>{ const p=place[m]; return p&&p.t==="house"&&p.a===area; });
+    const eligible=mons.filter(m=>{ const p=place[m]; if(!p) return false; if(p.t==="house") return p.a===area && !p.h; if(p.t==="h") return insts[p.i]&&insts[p.i].area===area; return false; });
+    const fromHabitat=eligible.filter(m=>place[m].t==="h");
     title=`House the ${habitat} group`;
-    const fitCount=Math.min(stillUnassigned.length,4)||1;
+    const fitCount=Math.min(eligible.length,4)||1;
     const list=HOUSE_TYPES.filter(hh=>hh.cap>=fitCount);
+    const customList=Object.entries(customTypes||{}).filter(([k,c])=>c.cap>=fitCount);
     node=(<div>
-      <div style={SB.reqLine}>{meta.e} {habitat} · {stillUnassigned.length} unassigned Pok\u00e9mon share this preference here: {stillUnassigned.join(", ")}</div>
+      <div style={SB.reqLine}>{meta.e} {habitat} · {eligible.length} Pok\u00e9mon share this preference here: {eligible.join(", ")}</div>
+      {fromHabitat.length>0 && <div style={SB.hint}>{fromHabitat.length===eligible.length?"All of them":`${fromHabitat.length} of them`} currently {fromHabitat.length===1?"lives":"live"} in a habitat here — moving into this house frees that habitat slot for a new spawn.</div>}
       <div style={SB.sectlabel}>Pick a house — the group moves in together, up to its capacity</div>
       <div style={SB.list}>
-        {stillUnassigned.length===0 && <div style={SB.hint}>These Pok\u00e9mon have already been housed.</div>}
+        {eligible.length===0 && <div style={SB.hint}>These Pok\u00e9mon have already been housed.</div>}
+        {customList.map(([k,c])=>(
+          <button key={k} style={SB.row} onClick={()=>{actions.buildHouseForGroup(k,eligible,area); onClose();}}>
+            <Home size={22} color="#5b6b5d"/>
+            <div style={{flex:1,textAlign:"left",minWidth:0}}><div style={{fontWeight:700,fontSize:13}}>{c.n}</div></div>
+            <span style={SB.tag}>{c.cap} {c.cap===1?"resident":"residents"}</span>
+          </button>
+        ))}
         {list.map(hh=>(
-          <button key={hh.k} style={SB.row} onClick={()=>{actions.buildHouseForGroup(hh.k,stillUnassigned,area); onClose();}}>
+          <button key={hh.k} style={SB.row} onClick={()=>{actions.buildHouseForGroup(hh.k,eligible,area); onClose();}}>
             <Home size={22} color="#5b6b5d"/>
             <div style={{flex:1,textAlign:"left",minWidth:0}}><div style={{fontWeight:700,fontSize:13}}>{hh.n}</div></div>
             <span style={SB.tag}>{hh.cap} {hh.cap===1?"resident":"residents"}</span>
           </button>
         ))}
       </div>
-      {stillUnassigned.length>4 && <div style={SB.hint}>Houses top out at 4 residents — the rest of the group can go into a second house together.</div>}
+      {eligible.length>4 && <div style={SB.hint}>Houses top out at 4 residents — the rest of the group can go into a second house together.</div>}
     </div>);
   } else if(sheet.type==="addHouse" || sheet.type==="addAny"){
     const any=sheet.type==="addAny";
@@ -596,11 +747,11 @@ function Sheet({sheet,area,A,pQuery,setPQuery,onClose,insts,houses,occByInst,occ
       {houseIds.length>0 && (<React.Fragment>
         <div style={SB.sectlabel}>Move into a house here</div>
         <div style={SB.list}>
-          {houseIds.map(id=>{ const h=houses[id]; const occHere=(occByHouse[id]||[]).filter(mm=>mm!==m); const c=occHere.length; const full=c>=h.cap; const bt=HOUSE_BY[h.b];
+          {houseIds.map(id=>{ const h=houses[id]; const occHere=(occByHouse[id]||[]).filter(mm=>mm!==m); const c=occHere.length; const full=c>=h.cap;
             const matches=occHere.length>0 && IDEAL_HABITAT[m] && occHere.some(mm=>IDEAL_HABITAT[mm]===IDEAL_HABITAT[m]); return (
             <button key={id} style={{...SB.row,...(full?SB.rowDim:{}),...(matches&&!full?SB.rowOn:{})}} onClick={()=>{if(!full){actions.assignToHouse(m,id); onClose();}}}>
               <Home size={20} color="#5b6b5d"/>
-              <span style={{flex:1,textAlign:"left",fontWeight:600}}>{bt?bt.n:h.b}</span>
+              <span style={{flex:1,textAlign:"left",fontWeight:600}}>{buildingLabel(h.b)}</span>
               {matches&&!full?<span style={SB.rec}>matches</span>:null}
               <span style={SB.tag}>{c}/{h.cap}{full?" full":""}</span>
             </button>
@@ -711,6 +862,10 @@ const S={
   tileName:{fontSize:12,fontWeight:700,marginTop:6,lineHeight:1.2,display:"flex",alignItems:"center",gap:5,flexWrap:"wrap"},
   dupTag:{display:"inline-flex",alignItems:"center",gap:2,fontSize:9.5,fontWeight:800,color:"#9a5c3e",background:"#F4E9DA",borderRadius:20,padding:"0 6px"},
   tileOcc:{display:"flex",alignItems:"center",gap:6,marginTop:7,background:"#f3f6f1",borderRadius:8,padding:"4px 7px"},
+  tileOccList:{display:"flex",flexDirection:"column",gap:3,marginTop:7},
+  tileOccRow:{display:"flex",alignItems:"center",gap:5,background:"#f3f6f1",borderRadius:7,padding:"3px 6px",minWidth:0},
+  tileOccName:{fontSize:11,fontWeight:600,color:"#2e3b2f",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",minWidth:0},
+  tileOccMore:{fontSize:10.5,fontWeight:700,color:"#8a988b",paddingLeft:6},
   tileEmpty:{fontSize:11.5,color:"#a4b0a5",marginTop:7,fontStyle:"italic"},
   addTile:{border:"1.5px dashed #cdd6cc",borderRadius:13,background:"rgba(255,255,255,.5)",color:"#5b6b5d",fontFamily:FONT,fontWeight:700,fontSize:13,cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:5,minHeight:110},
   houseBin:{display:"flex",flexWrap:"wrap",gap:7,background:"rgba(255,255,255,.5)",border:"1.5px dashed #d7dfd6",borderRadius:12,padding:10,minHeight:44,alignItems:"center"},
@@ -744,6 +899,13 @@ const SB={
   primary:{display:"inline-flex",alignItems:"center",gap:6,fontFamily:FONT,fontSize:13,fontWeight:700,color:"#fff",background:"#3E9A60",border:"none",borderRadius:10,padding:"9px 14px",cursor:"pointer"},
   ghost:{display:"inline-flex",alignItems:"center",gap:6,fontFamily:FONT,fontSize:13,fontWeight:700,color:"#5b6b5d",background:"#f3f6f1",border:"1px solid #e0e7df",borderRadius:10,padding:"9px 13px",cursor:"pointer"},
   danger:{display:"inline-flex",alignItems:"center",gap:6,fontFamily:FONT,fontSize:13,fontWeight:700,color:"#b04a3a",background:"#fbece9",border:"1px solid #f2d4cd",borderRadius:10,padding:"9px 13px",cursor:"pointer"},
+  rowBad:{display:"flex",alignItems:"center",gap:10,width:"100%",background:"#FBF4E8",border:"1px solid #f0d9b5",borderRadius:10,padding:"9px 11px",fontFamily:FONT,fontSize:13.5,color:"#2f3a30",boxSizing:"border-box"},
+  badTag:{fontSize:10,fontWeight:800,color:"#B9743A",background:"#F4E9DA",borderRadius:20,padding:"1px 7px",whiteSpace:"nowrap"},
+  moveBtn:{fontFamily:FONT,fontSize:11.5,fontWeight:700,color:"#fff",background:"#B9743A",border:"none",borderRadius:8,padding:"6px 9px",cursor:"pointer",whiteSpace:"nowrap"},
+  customAdd:{display:"flex",alignItems:"center",justifyContent:"center",gap:6,width:"100%",fontFamily:FONT,fontSize:13,fontWeight:700,color:"#3E9A60",background:"#E0F1E5",border:"none",borderRadius:10,padding:"10px 13px",cursor:"pointer",margin:"2px 0 10px"},
+  formRow:{display:"flex",flexDirection:"column",gap:5,margin:"10px 2px"},
+  formLabel:{fontSize:11.5,fontWeight:800,color:"#8a958b",textTransform:"uppercase",letterSpacing:.4},
+  formInput:{fontFamily:FONT,fontSize:14,color:"#2f3a30",background:"#f3f6f1",border:"1px solid #e0e7df",borderRadius:10,padding:"10px 12px",outline:"none"},
 };
 const CSS=`
   .tapchip:active{transform:scale(.96);}
