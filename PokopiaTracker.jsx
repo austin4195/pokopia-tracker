@@ -137,7 +137,7 @@ function findBetterHouse(mon,currentHouseId,areaKey,houses,occByHouse){
   return emptyFallback;
 }
 
-const VERSION="v6.4.1", BUILD="2026-07-08";
+const VERSION="v6.5.0", BUILD="2026-07-13";
 const V6="pokopia:tracker:v6", V5="pokopia:tracker:v5", V4="pokopia:tracker:v4", V3="pokopia:tracker:v3", V2="pokopia:tracker:v2", V1="pokopia:tracker";
 function boardAreaFor(mon){ const a=AREA_OF[mon]; return AREA_BY[a] && !AREA_BY[a].special ? a : null; }
 function v3ToV4(v3){ const built={},place={},extra={}; const habs=v3.habitats||{};
@@ -256,15 +256,23 @@ export default function PokopiaTracker(){
     try{ if(hasClaudeStorage()){ keys.forEach(k=>window.storage.delete(k)); } }catch(e){}
     try{ keys.forEach(k=>localStorage.removeItem(k)); }catch(e){} };
 
-  /* ---- recommendations (instance-aware, scoped to area) ---- */
+  /* ---- recommendations (instance-aware, scoped to area) ----
+     HAB_SPAWNS[habitatNumber] pools every Pokémon that can use that habitat NUMBER across
+     the whole island, but the same habitat number is reused by different areas, each with
+     its own subset of valid spawns (see each mon's `cond`, e.g. "Palette Town only"). Every
+     mon has exactly one true home area via AREA_OF (built from the AREAS roster), so we must
+     filter every candidate list down to AREA_OF[mon]===area — otherwise a mon that only
+     actually spawns in a different area (e.g. Scizor, Palette Town only) can leak into this
+     area's recommendations just because it shares a habitat number with something that does
+     belong here. */
   const recs=useMemo(()=>{
     const emptyReady=[], freeSlot=[], build=[];
     const areaIds=Object.keys(insts).filter(id=>insts[id].area===area);
     const emptyTypes=new Set(); const typeCount={};
     for(const id of areaIds){ const t=insts[id].hab; typeCount[t]=(typeCount[t]||0)+1; if(!occByInst[id]) emptyTypes.add(t); }
-    for(const t of emptyTypes){ const miss=(HAB_SPAWNS[t]||[]).filter(s=>!isBef(s.mon)).map(s=>s.mon); if(miss.length) emptyReady.push({n:+t,miss}); }
-    for(const id of areaIds){ const occ=occByInst[id]; if(!occ) continue; const t=insts[id].hab; const miss=(HAB_SPAWNS[t]||[]).filter(s=>!isBef(s.mon)).map(s=>s.mon); if(miss.length) freeSlot.push({n:+t,occ,miss,id}); }
-    for(const n of Object.keys(HAB_INFO)){ if(HAB_AREA[n]!==area) continue; if(emptyTypes.has(+n)) continue; const miss=(HAB_SPAWNS[n]||[]).filter(s=>!isBef(s.mon)).map(s=>s.mon); if(miss.length) build.push({n:+n,miss,another:(typeCount[n]||0)>0}); }
+    for(const t of emptyTypes){ const miss=(HAB_SPAWNS[t]||[]).filter(s=>!isBef(s.mon)&&AREA_OF[s.mon]===area).map(s=>s.mon); if(miss.length) emptyReady.push({n:+t,miss}); }
+    for(const id of areaIds){ const occ=occByInst[id]; if(!occ) continue; const t=insts[id].hab; const miss=(HAB_SPAWNS[t]||[]).filter(s=>!isBef(s.mon)&&AREA_OF[s.mon]===area).map(s=>s.mon); if(miss.length) freeSlot.push({n:+t,occ,miss,id}); }
+    for(const n of Object.keys(HAB_INFO)){ if(HAB_AREA[n]!==area) continue; if(emptyTypes.has(+n)) continue; const miss=(HAB_SPAWNS[n]||[]).filter(s=>!isBef(s.mon)&&AREA_OF[s.mon]===area).map(s=>s.mon); if(miss.length) build.push({n:+n,miss,another:(typeCount[n]||0)>0}); }
     const by=(a,b)=>b.miss.length-a.miss.length||a.n-b.n;
     emptyReady.sort(by); freeSlot.sort(by); build.sort(by);
     return {emptyReady,freeSlot,build};
@@ -386,7 +394,7 @@ export default function PokopiaTracker(){
               for(const s of SPEC_ORDER){ const who=(SPEC_DATA[s]||[]).filter(m=>monSet.has(m)); if(who.length) covered.push([s,who]); else missing.push(s); }
               return (<React.Fragment>
                 <div style={S.subtle}>{covered.length} of {SPEC_ORDER.length} specialties covered {specScope==="area"?("in "+A.short):"on your island"}.</div>
-                {covered.length===0 && <div style={S.recEmpty}>No specialties yet — register some Pok\u00e9mon {specScope==="area"?"here":""} first.</div>}
+                {covered.length===0 && <div style={S.recEmpty}>No specialties yet — register some Pokémon {specScope==="area"?"here":""} first.</div>}
                 {covered.map(([s,who])=>(
                   <div key={s} style={S.specCard}>
                     <div style={S.specHead}><span style={S.specEmoji}>{(SPEC_META[s]||{}).e||"\u2B50"}</span><span style={S.specName}>{s}</span><span style={S.specCount}>{who.length}</span></div>
@@ -455,7 +463,7 @@ export default function PokopiaTracker(){
               <div style={{display:"flex",flexDirection:"column",gap:7,marginBottom:14}}>
                 {mixedHouses.map(({id,occ,info})=>(
                   <button key={id} style={{...S.houseRecCard,borderColor:"#f0d9b5",background:"#FBF4E8"}} onClick={()=>setSheet({type:"house",id})}>
-                    <span style={{fontSize:18,lineHeight:1}}>\u26A0\uFE0F</span>
+                    <span style={{fontSize:18,lineHeight:1}}>⚠️</span>
                     <div style={{flex:1,minWidth:0,textAlign:"left"}}>
                       <div style={{fontWeight:700,fontSize:13}}>{buildingLabel(houses[id].b)} · {info.mismatched.size} of {occ.length} don't match</div>
                       <div style={{fontSize:12,color:"#5b6b5d",marginTop:2}}>
@@ -528,7 +536,7 @@ function HabitatDot({mon,sz=11}){ const h=IDEAL_HABITAT[mon]; if(!h) return null
 function Sheet({sheet,area,A,pQuery,setPQuery,onClose,goTo,seq,insts,houses,customTypes,occByInst,occByHouse,isBef,countByHab,place,actions}){
   const q=pQuery.trim().toLowerCase();
   const allPoke=Object.keys(SPRITE_ID);
-  const areaIdsOf=(habN)=> Object.keys(insts).filter(id=>insts[id].area===area && insts[id].hab===+habN);
+  const areaIdsOf=(habN,a=area)=> Object.keys(insts).filter(id=>insts[id].area===a && insts[id].hab===+habN);
   const [customName,setCustomName]=useState("");
   const [customCap,setCustomCap]=useState("");
   const buildingLabel=(key)=> (customTypes&&customTypes[key]&&customTypes[key].n) || (HOUSE_BY[key]&&HOUSE_BY[key].n) || key;
@@ -555,7 +563,8 @@ function Sheet({sheet,area,A,pQuery,setPQuery,onClose,goTo,seq,insts,houses,cust
         <div style={SB.reqLine}>{HAB_INFO[habN].req}</div>
         <div style={SB.sectlabel}>Who lives here?</div>
         <div style={SB.list}>
-          {(HAB_SPAWNS[habN]||[]).map(s=>(
+          {(HAB_SPAWNS[habN]||[]).filter(s=>AREA_OF[s.mon]===area).length===0 && <div style={SB.hint}>No Pokémon that actually spawn here belong to {A.short} — this habitat may have been built in the wrong area.</div>}
+          {(HAB_SPAWNS[habN]||[]).filter(s=>AREA_OF[s.mon]===area).map(s=>(
             <button key={s.mon} style={{...SB.row,...(occ===s.mon?SB.rowOn:{})}} onClick={()=>{actions.setOccupant(id,s.mon); onClose();}}>
               <Spr m={s.mon} sz={24}/><span style={{flex:1,textAlign:"left",fontWeight:600}}>{s.mon}</span>
               {isBef(s.mon)&&occ!==s.mon?<span style={SB.tag}>caught</span>:null}{occ===s.mon?<Check size={15} strokeWidth={3} color="#3E9A60"/>:null}
@@ -663,7 +672,7 @@ function Sheet({sheet,area,A,pQuery,setPQuery,onClose,goTo,seq,insts,houses,cust
         {occ.length<h.cap && (<React.Fragment>
           <div style={SB.sectlabel}>Add resident — unhoused in {A.short}</div>
           <div style={SB.list}>
-            {unhoused.length===0 && <div style={SB.hint}>No unhoused Pok\u00e9mon here yet — add one from the Unassigned bin first.</div>}
+            {unhoused.length===0 && <div style={SB.hint}>No unhoused Pokémon here yet — add one from the Unassigned bin first.</div>}
             {unhoused.map(m=>{ const matches=occHabitats.size>0 && occHabitats.has(IDEAL_HABITAT[m]); return (
               <button key={m} style={{...SB.row,...(matches?SB.rowOn:{})}} onClick={()=>{actions.assignToHouse(m,id); onClose();}}>
                 <Spr m={m} sz={24}/><span style={{flex:1,textAlign:"left",fontWeight:600}}>{m}</span><HabitatDot mon={m}/>
@@ -698,11 +707,11 @@ function Sheet({sheet,area,A,pQuery,setPQuery,onClose,goTo,seq,insts,houses,cust
     const list=HOUSE_TYPES.filter(hh=>hh.cap>=fitCount);
     const customList=Object.entries(customTypes||{}).filter(([k,c])=>c.cap>=fitCount);
     node=(<div>
-      <div style={SB.reqLine}>{meta.e} {habitat} · {eligible.length} Pok\u00e9mon share this preference here: {eligible.join(", ")}</div>
+      <div style={SB.reqLine}>{meta.e} {habitat} · {eligible.length} Pokémon share this preference here: {eligible.join(", ")}</div>
       {fromHabitat.length>0 && <div style={SB.hint}>{fromHabitat.length===eligible.length?"All of them":`${fromHabitat.length} of them`} currently {fromHabitat.length===1?"lives":"live"} in a habitat here — moving into this house frees that habitat slot for a new spawn.</div>}
       <div style={SB.sectlabel}>Pick a house — the group moves in together, up to its capacity</div>
       <div style={SB.list}>
-        {eligible.length===0 && <div style={SB.hint}>These Pok\u00e9mon have already been housed.</div>}
+        {eligible.length===0 && <div style={SB.hint}>These Pokémon have already been housed.</div>}
         {customList.map(([k,c])=>(
           <button key={k} style={SB.row} onClick={()=>{actions.buildHouseForGroup(k,eligible,area); onClose();}}>
             <Home size={22} color="#5b6b5d"/>
@@ -725,28 +734,45 @@ function Sheet({sheet,area,A,pQuery,setPQuery,onClose,goTo,seq,insts,houses,cust
     title=any? "Add any Pokémon to "+A.short : "Add a house resident — "+A.short;
     const base=any? allPoke : A.mon;
     const list=base.filter(m=>!q||m.toLowerCase().includes(q));
+    const statusOf=(m)=>{
+      const p=place[m];
+      if(p){
+        if(p.t==="h") return {label:"in habitat", style:SB.tagHabitat};
+        if(p.t==="house"&&p.h) return {label:"housed", style:SB.tagHouse};
+        if(p.t==="house") return {label:"unassigned", style:SB.tagUnassigned};
+      }
+      if(extra[m]) return {label:"caught", style:SB.tag};
+      return null;
+    };
     node=(<div style={SB.list}>
-      {list.slice(0,300).map(m=>(<button key={m} style={{...SB.row,...(isBef(m)?SB.rowDim:{})}} onClick={()=>{actions.addHouse(m,area); onClose();}}>
-        <Spr m={m} sz={24}/><span style={{flex:1,textAlign:"left",fontWeight:600}}>{m}</span>{isBef(m)?<span style={SB.tag}>caught</span>:null}</button>))}
+      {list.slice(0,300).map(m=>{ const status=statusOf(m); return (
+        <button key={m} style={{...SB.row,...(status?SB.rowDim:{})}}
+          onClick={()=>{ if(isBef(m)){ goTo({type:"place",mon:m,area:AREA_OF[m]||area}); } else { actions.addHouse(m,area); } }}>
+          <Spr m={m} sz={24}/><span style={{flex:1,textAlign:"left",fontWeight:600}}>{m}</span>
+          {status?<span style={status.style}>{status.label}</span>:null}
+        </button>
+      );})}
       {list.length===0 && <div style={SB.hint}>No matches.</div>}
     </div>);
   } else if(sheet.type==="place"){
     const m=sheet.mon; title=m;
+    const effArea=sheet.area||area; const effA=AREA_BY[effArea]||A;
     const habs=HABITAT_DATA[m]||[];
     const reqCount=(r)=> (r? r.split(",").length : 99);
     const rank={empty:0,unbuilt:1,occupied:2};
-    const ann=habs.map(h=>{ const ids=areaIdsOf(h.n); const emptyIds=ids.filter(id=>!occByInst[id]);
+    const ann=habs.map(h=>{ const ids=areaIdsOf(h.n,effArea); const emptyIds=ids.filter(id=>!occByInst[id]);
       const st=emptyIds.length?"empty":(ids.length?"occupied":"unbuilt");
       const occ=ids.length? occByInst[ids.find(id=>occByInst[id])] : null;
       return {...h, ids, emptyIds, st, occ}; })
       .sort((a,b)=> rank[a.st]-rank[b.st] || reqCount(a.req)-reqCount(b.req) || a.n-b.n);
     node=(<div>
+      {effArea!==area && <div style={SB.hint}>{m} belongs in {effA.short}, not {A.short} — showing habitats there instead.</div>}
       {habs.length? <div style={SB.sectlabel}>Where does {m} live? Tap a habitat — it's built here if you haven't already</div>
                   : <div style={SB.hint}>{m} doesn't come from a habitat (event / story). House it below if caught.</div>}
       <div style={SB.list}>
         {ann.map((h,i)=>(
           <div key={h.n} style={{...SB.row,...(h.st==="empty"?SB.rowOn:{}),cursor:"pointer"}}
-            onClick={()=>{actions.buildAndOccupy(h.n,m,area); onClose();}}>
+            onClick={()=>{actions.buildAndOccupy(h.n,m,effArea); onClose();}}>
             <img src={HAB_IMG(h.n)} alt="" referrerPolicy="no-referrer" style={{width:38,height:28,objectFit:"contain",flexShrink:0}} onError={e=>{e.currentTarget.style.display="none";}}/>
             <div style={{flex:1,minWidth:0,textAlign:"left"}}>
               <div style={{fontWeight:700,fontSize:13,display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>#{h.n} {HAB_INFO[h.n].name}{i===0? <span style={SB.rec}>Recommended</span>:null}</div>
@@ -758,16 +784,19 @@ function Sheet({sheet,area,A,pQuery,setPQuery,onClose,goTo,seq,insts,houses,cust
           </div>
         ))}
       </div>
-      <div style={SB.actionRow}><button style={SB.primary} onClick={()=>{actions.addHouse(m,area); onClose();}}><Home size={14}/> Caught it — house here</button></div>
+      <div style={SB.actionRow}><button style={SB.primary} onClick={()=>{actions.addHouse(m,effArea); onClose();}}><Home size={14}/> Caught it — house here</button></div>
     </div>);
   } else if(sheet.type==="poke"){
     const m=sheet.mon; title=m;
-    const ids=Object.keys(insts).filter(id=>insts[id].area===area).sort((a,b)=>insts[a].hab-insts[b].hab);
+    const validHabNs=new Set((HABITAT_DATA[m]||[]).map(h=>h.n));
+    const ids=Object.keys(insts).filter(id=>insts[id].area===area && validHabNs.has(insts[id].hab)).sort((a,b)=>insts[a].hab-insts[b].hab);
     const houseIds=Object.keys(houses).filter(id=>houses[id].area===area);
     node=(<div>
       <div style={SB.sectlabel}>Move to a habitat here</div>
       <div style={SB.list}>
-        {ids.length===0 && <div style={SB.hint}>No habitats built here yet.</div>}
+        {ids.length===0 && (validHabNs.size===0
+          ? <div style={SB.hint}>{m} doesn't come from a habitat (event/story) — house them instead.</div>
+          : <div style={SB.hint}>No habitat {m} can actually live in has been built here yet.</div>)}
         {ids.map(id=>{ const habN=insts[id].hab; const occ=occByInst[id]; return (
           <button key={id} style={SB.row} onClick={()=>{actions.moveToInstance(m,id); onClose();}}>
             <img src={HAB_IMG(habN)} alt="" referrerPolicy="no-referrer" style={{width:34,height:26,objectFit:"contain"}} onError={e=>{e.currentTarget.style.display="none";}}/>
@@ -787,6 +816,7 @@ function Sheet({sheet,area,A,pQuery,setPQuery,onClose,goTo,seq,insts,houses,cust
           );})}
         </div>
       </React.Fragment>)}
+      {validHabNs.size>0 && <div style={SB.actionRow}><button style={SB.ghost} onClick={()=>goTo({type:"place",mon:m,area:AREA_OF[m]||area})}><Target size={13}/> See recommended habitat</button></div>}
       <div style={SB.actionRow}><button style={SB.danger} onClick={()=>{actions.unplace(m); onClose();}}><Trash2 size={13}/> Remove (not caught)</button></div>
     </div>);
   }
@@ -920,6 +950,9 @@ const SB={
   rowOn:{background:"#E0F1E5",borderColor:"#bfe3cb"},
   rowDim:{opacity:.55},
   tag:{fontSize:10.5,fontWeight:700,color:"#8a958b",background:"#f1f4f0",borderRadius:20,padding:"1px 7px"},
+  tagHabitat:{fontSize:10.5,fontWeight:700,color:"#3E9A60",background:"#E0F1E5",borderRadius:20,padding:"1px 7px",whiteSpace:"nowrap"},
+  tagHouse:{fontSize:10.5,fontWeight:700,color:"#1E9AAE",background:"#DCF0F1",borderRadius:20,padding:"1px 7px",whiteSpace:"nowrap"},
+  tagUnassigned:{fontSize:10.5,fontWeight:700,color:"#9a5c3e",background:"#F4E9DA",borderRadius:20,padding:"1px 7px",whiteSpace:"nowrap"},
   rec:{fontSize:10,fontWeight:800,color:"#B9743A",background:"#F4E9DA",borderRadius:20,padding:"1px 7px"},
   sectlabel:{fontSize:11.5,fontWeight:800,color:"#8a958b",textTransform:"uppercase",letterSpacing:.4,margin:"8px 2px 6px"},
   reqLine:{fontSize:12.5,color:"#7d8a7e",margin:"2px 2px 4px"},

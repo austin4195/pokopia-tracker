@@ -1,7 +1,7 @@
 import { loadReal } from "./extract.mjs";
 
-const { ctx, mutations } = loadReal();
-const { v5ToV6, HOUSE_BY, houseMismatchInfo, findBetterHouse } = ctx;
+const { ctx, mutations, computeRecs } = loadReal();
+const { v5ToV6, HOUSE_BY, houseMismatchInfo, findBetterHouse, AREA_OF } = ctx;
 const { addHouseBuilding, addCustomHouse, removeHouseBuilding, assignToHouse, unassignHouse, buildHouseForGroup } = mutations;
 
 let pass = 0, fail = 0;
@@ -165,6 +165,44 @@ assert(HOUSE_BY["leaf-hut"].cap === 1, "real HOUSE_BY: leaf-hut cap is 1");
 assert(HOUSE_BY["leaf-cottage"].cap === 2, "real HOUSE_BY: leaf-cottage cap is 2");
 assert(HOUSE_BY["leaf-house"].cap === 4, "real HOUSE_BY: leaf-house cap is 4");
 assert(Object.keys(ctx.IDEAL_HABITAT).length === 308, "real IDEAL_HABITAT has the expected 308 mapped species");
+
+// --- recs: mons must never leak into another area's recommendations just because they
+//     share a habitat NUMBER (the exact bug reported: Scizor — Palette Town only — showing
+//     up as obtainable in Withered Wasteland) ---
+{
+  // habitat #2 (Tree-shaded tall grass) built in WASTELAND, occupied so it shows under "free a slot"
+  const insts = { i1: { hab: 2, area: "WASTELAND" } };
+  const place = { Scyther: { t: "h", i: "i1" } };
+  const extra = {};
+  const occByInst = { i1: "Scyther" };
+  const wastelandRecs = computeRecs(insts, place, extra, occByInst, "WASTELAND");
+  const freeSlotMons = wastelandRecs.freeSlot.flatMap(f => f.miss);
+  assert(!freeSlotMons.includes("Scizor"), "Scizor (Palette Town only) must not appear in Withered Wasteland's 'free a slot' recommendations");
+  assert(!freeSlotMons.includes("Skwovet"), "Skwovet (also Palette Town only, same habitat number) must not leak into Wasteland either");
+  assert(freeSlotMons.includes("Bellsprout") && freeSlotMons.includes("Pinsir") && freeSlotMons.includes("Heracross"), "actual Wasteland-native spawns for this habitat are still recommended");
+  assert(AREA_OF["Scizor"] === "TOWN", "sanity check: Scizor's real home area is Palette Town, confirming the fixture matches the reported scenario");
+
+  // same habitat number, but built in Scizor's actual home area (TOWN) — it SHOULD show up there
+  const insts2 = { i2: { hab: 2, area: "TOWN" } };
+  const place2 = { Bellsprout: { t: "h", i: "i2" } };
+  const townRecs = computeRecs(insts2, place2, {}, { i2: "Bellsprout" }, "TOWN");
+  const townFreeSlotMons = townRecs.freeSlot.flatMap(f => f.miss);
+  assert(townFreeSlotMons.includes("Scizor"), "Scizor correctly appears as a recommendation when the same habitat is built in its actual home area (Palette Town)");
+}
+
+// --- same cross-area leakage bug, for the "build next" and "empty and ready" recommendation buckets ---
+{
+  // an empty (unoccupied) habitat #2 built in WASTELAND
+  const insts = { i1: { hab: 2, area: "WASTELAND" } };
+  const emptyRecs = computeRecs(insts, {}, {}, {}, "WASTELAND");
+  const emptyReadyMons = emptyRecs.emptyReady.flatMap(f => f.miss);
+  assert(!emptyReadyMons.includes("Scizor"), "'empty and ready' also must not recommend Scizor for a Wasteland habitat");
+
+  // "build next" for an area should never include another area's exclusive mon under a shared habitat number
+  const buildRecs = computeRecs({}, {}, {}, {}, "WASTELAND");
+  const buildMonsForHab2 = (buildRecs.build.find(b => b.n === 2) || { miss: [] }).miss;
+  assert(!buildMonsForHab2.includes("Scizor"), "'build next' for Wasteland must not list Scizor under a shared habitat number");
+}
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

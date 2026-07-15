@@ -58,6 +58,7 @@ export function loadReal() {
     "houseMismatchInfo", "findBetterHouse", "v5ToV6", "EMPTY", "VERSION",
     "hasClaudeStorage", "getKey", "loadState", "saveState",
     "V6", "V5", "V4", "V3", "V2", "V1",
+    "AREA_OF", "AREA_BY", "HAB_SPAWNS", "HAB_AREA", "HAB_INFO", "HABITAT_DATA",
   ];
   const epilogue = `\nObject.assign(globalThis, {${exposeNames.join(",")}});\n`;
 
@@ -99,5 +100,20 @@ export function loadReal() {
     mutations[name] = vm.runInContext(fnSrc, ctx, { filename: `PokopiaTracker.jsx (${name})` });
   }
 
-  return { ctx, mutations };
+  // 3. Extract the `recs` useMemo (the area-scoped habitat recommendation engine) as a
+  //    standalone function. It closes over insts/place/extra/occByInst/area/isBef inside the
+  //    component; isBef itself is a one-liner (`!!place[m] || !!extra[m]`), so it's inlined
+  //    here rather than requiring a second extraction pass.
+  const recsRe = /const recs=useMemo\(\(\)=>\{/;
+  const recsMatch = recsRe.exec(src);
+  if (!recsMatch) throw new Error("Could not find the recs useMemo in source (its shape may have changed)");
+  const recsBodyStart = recsMatch.index + recsMatch[0].length - 1; // position of the opening {
+  const recsBlock = extractBalanced(src, recsBodyStart);
+  const computeRecsSrc = `(function(insts, place, extra, occByInst, area){
+    const isBef=(m)=> !!place[m] || !!extra[m];
+    ${recsBlock.slice(1, -1)}
+  })`;
+  const computeRecs = vm.runInContext(computeRecsSrc, ctx, { filename: "PokopiaTracker.jsx (recs)" });
+
+  return { ctx, mutations, computeRecs };
 }
